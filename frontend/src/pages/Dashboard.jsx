@@ -192,26 +192,27 @@ const TestCasesTable = ({
 
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-[1380px] table-fixed border-collapse text-left text-sm">
-        <thead className="bg-slate-100 text-xs uppercase text-slate-600">
+      <table className="min-w-[1320px] table-fixed border-collapse text-left text-sm">
+        <thead className="bg-slate-50 text-xs uppercase text-slate-500">
           <tr>
             {selectable && (
               <th className="w-12 px-4 py-3 font-semibold">
                 <input
+                  className="h-4 w-4 rounded border-slate-300 text-emerald-700 accent-emerald-700"
                   checked={allSelected}
                   onChange={onToggleAll}
                   type="checkbox"
                 />
               </th>
             )}
-            <th className="w-40 px-4 py-3 font-semibold">Project Name</th>
-            <th className="w-40 px-4 py-3 font-semibold">Module Name</th>
+            <th className="w-36 px-5 py-4 font-semibold">Project Name</th>
+            <th className="w-36 px-5 py-4 font-semibold">Module Name</th>
             <th className="w-28 px-4 py-3 font-semibold">Test Case ID</th>
-            <th className="w-64 px-4 py-3 font-semibold">Test Scenario</th>
-            <th className="w-80 px-4 py-3 font-semibold">Test Steps</th>
-            <th className="w-72 px-4 py-3 font-semibold">Expected Result</th>
+            <th className="w-64 px-5 py-4 font-semibold">Test Scenario</th>
+            <th className="w-72 px-5 py-4 font-semibold">Test Steps</th>
+            <th className="w-72 px-5 py-4 font-semibold">Expected Result</th>
             <th className="w-28 px-4 py-3 font-semibold">Priority</th>
-            <th className="w-52 px-4 py-3 font-semibold">Actions</th>
+            <th className="w-52 px-5 py-4 font-semibold">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-200">
@@ -219,17 +220,18 @@ const TestCasesTable = ({
             const isEditing = editingId === testCase.id;
 
             return (
-              <tr className="align-top" key={testCase.id}>
+              <tr className="align-top transition hover:bg-slate-50" key={testCase.id}>
                 {selectable && (
                   <td className="px-4 py-4">
                     <input
+                      className="h-4 w-4 rounded border-slate-300 text-emerald-700 accent-emerald-700"
                       checked={selectedIds.includes(testCase.id)}
                       onChange={() => onToggleSelected(testCase.id)}
                       type="checkbox"
                     />
                   </td>
                 )}
-                <td className="px-4 py-4 text-slate-700">
+                <td className="px-5 py-5 text-slate-700">
                   {isEditing ? (
                     <input
                       className="w-full rounded-md border border-slate-300 px-2 py-1 outline-none focus:border-emerald-600"
@@ -241,7 +243,7 @@ const TestCasesTable = ({
                     testCase.projectName
                   )}
                 </td>
-                <td className="px-4 py-4 text-slate-700">
+                <td className="px-5 py-5 text-slate-700">
                   {isEditing ? (
                     <input
                       className="w-full rounded-md border border-slate-300 px-2 py-1 outline-none focus:border-emerald-600"
@@ -254,7 +256,7 @@ const TestCasesTable = ({
                   )}
                 </td>
                 <td className="px-4 py-4 font-semibold text-slate-900">{testCase.testCaseId}</td>
-                <td className="px-4 py-4 text-slate-700">
+                <td className="px-5 py-5 text-slate-700">
                   {isEditing ? (
                     <textarea
                       className="min-h-24 w-full rounded-md border border-slate-300 px-2 py-1 outline-none focus:border-emerald-600"
@@ -266,7 +268,7 @@ const TestCasesTable = ({
                     testCase.testScenario
                   )}
                 </td>
-                <td className="px-4 py-4 text-slate-700">
+                <td className="px-5 py-5 text-slate-700">
                   {isEditing ? (
                     <textarea
                       className="min-h-32 w-full rounded-md border border-slate-300 px-2 py-1 outline-none focus:border-emerald-600"
@@ -282,7 +284,7 @@ const TestCasesTable = ({
                     </ol>
                   )}
                 </td>
-                <td className="px-4 py-4 text-slate-700">
+                <td className="px-5 py-5 text-slate-700">
                   {isEditing ? (
                     <textarea
                       className="min-h-24 w-full rounded-md border border-slate-300 px-2 py-1 outline-none focus:border-emerald-600"
@@ -294,7 +296,7 @@ const TestCasesTable = ({
                     testCase.expectedResult
                   )}
                 </td>
-                <td className="px-4 py-4">
+                <td className="px-4 py-5">
                   {isEditing ? (
                     <select
                       className="w-full rounded-md border border-slate-300 px-2 py-1 text-slate-700 outline-none focus:border-emerald-600"
@@ -312,7 +314,7 @@ const TestCasesTable = ({
                     </span>
                   )}
                 </td>
-                <td className="px-4 py-4">
+                <td className="px-5 py-5">
                   {isEditing ? (
                     <div className="flex flex-wrap gap-2">
                       <button
@@ -334,7 +336,7 @@ const TestCasesTable = ({
                     <div className="flex flex-wrap gap-2">
                       {showSave && (
                         <button
-                          className="rounded-md bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800 disabled:bg-slate-400"
+                          className="rounded-md bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-800 disabled:bg-slate-400"
                           disabled={testCase.saved}
                           onClick={() => onSave(testCase)}
                           type="button"
@@ -369,7 +371,7 @@ const TestCasesTable = ({
 };
 
 const Dashboard = ({ user, onLogout }) => {
-  const [activeView, setActiveView] = useState("generator");
+  const [activeView, setActiveView] = useState("generate");
   const [form, setForm] = useState(initialForm);
   const [generatedTestCases, setGeneratedTestCases] = useState([]);
   const [savedTestCases, setSavedTestCases] = useState([]);
@@ -456,7 +458,7 @@ const Dashboard = ({ user, onLogout }) => {
     try {
       const { data } = await api.post("/tests/generate", form);
       setGeneratedTestCases(data.testCases);
-      setActiveView("generator");
+      setActiveView("generate");
       setMessage(`${data.testCases.length} test cases generated.`);
     } catch (requestError) {
       setError(requestError.response?.data?.message || "Could not generate test cases");
@@ -610,320 +612,367 @@ const Dashboard = ({ user, onLogout }) => {
     );
   };
 
+  const navigationItems = [
+    { id: "generate", label: "Generate Test Cases" },
+    { id: "saved", label: "Saved Test Cases" },
+    { id: "dashboard", label: "Dashboard" }
+  ];
+
+  const pageDetails = {
+    generate: {
+      title: "Generate Test Cases",
+      helper: "Start here. Describe a feature and create structured QA test cases in seconds."
+    },
+    saved: {
+      title: "Saved Test Cases",
+      helper: "Search, filter, edit, delete, and export selected saved test cases."
+    },
+    dashboard: {
+      title: "Dashboard",
+      helper: "Review saved test case totals and priority distribution."
+    }
+  };
+
   return (
-    <main className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4">
-          <div>
-            <p className="text-sm font-semibold text-emerald-700">TestMate AI</p>
-            <h1 className="text-xl font-bold text-slate-950">Test Case Workspace</h1>
+    <div className="min-h-screen bg-slate-50 text-slate-900">
+      <aside className="fixed left-0 top-0 z-30 flex h-screen w-[260px] flex-col border-r border-slate-200 bg-white p-6">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-700 text-sm font-bold text-white shadow-sm">
+            TM
           </div>
-          <div className="flex items-center gap-4">
-            <p className="hidden text-sm text-slate-600 sm:block">{user.name}</p>
+          <div>
+            <p className="text-lg font-bold leading-6 text-slate-950">TestMate AI</p>
+            <p className="text-sm leading-5 text-slate-500">QA Test Case Generator</p>
+          </div>
+        </div>
+
+        <nav className="mt-8 flex flex-col gap-2">
+          {navigationItems.map((item) => (
             <button
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
-              onClick={onLogout}
+              className={`rounded-xl px-4 py-3 text-left text-sm font-semibold transition ${
+                activeView === item.id
+                  ? "bg-emerald-700 text-white shadow-sm"
+                  : "text-slate-600 hover:bg-emerald-50 hover:text-emerald-800"
+              }`}
+              key={item.id}
+              onClick={() => setActiveView(item.id)}
               type="button"
             >
-              Logout
+              {item.label}
             </button>
-          </div>
-        </div>
-      </header>
+          ))}
+        </nav>
 
-      <section className="mx-auto max-w-7xl px-4 py-8">
-        <div className="grid gap-4 md:grid-cols-4">
-          <div className="rounded-lg border border-slate-200 bg-white p-5">
-            <p className="text-sm text-slate-500">Total saved test cases</p>
-            <p className="mt-2 text-3xl font-bold text-slate-950">{savedSummary.total}</p>
-          </div>
-          <div className="rounded-lg border border-slate-200 bg-white p-5">
-            <p className="text-sm text-slate-500">High priority test cases</p>
-            <p className="mt-2 text-3xl font-bold text-slate-950">{savedSummary.High}</p>
-          </div>
-          <div className="rounded-lg border border-slate-200 bg-white p-5">
-            <p className="text-sm text-slate-500">Medium priority test cases</p>
-            <p className="mt-2 text-3xl font-bold text-slate-950">{savedSummary.Medium}</p>
-          </div>
-          <div className="rounded-lg border border-slate-200 bg-white p-5">
-            <p className="text-sm text-slate-500">Low priority test cases</p>
-            <p className="mt-2 text-3xl font-bold text-slate-950">{savedSummary.Low}</p>
-          </div>
-        </div>
+        <button
+          className="mt-auto rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+          onClick={onLogout}
+          type="button"
+        >
+          Logout
+        </button>
+      </aside>
 
-        <div className="mt-6 flex flex-wrap gap-2 border-b border-slate-200">
-          <button
-            className={`border-b-2 px-4 py-3 text-sm font-semibold ${
-              activeView === "generator"
-                ? "border-emerald-700 text-emerald-700"
-                : "border-transparent text-slate-600 hover:text-slate-950"
-            }`}
-            onClick={() => setActiveView("generator")}
-            type="button"
-          >
-            Generator
-          </button>
-          <button
-            className={`border-b-2 px-4 py-3 text-sm font-semibold ${
-              activeView === "saved"
-                ? "border-emerald-700 text-emerald-700"
-                : "border-transparent text-slate-600 hover:text-slate-950"
-            }`}
-            onClick={() => setActiveView("saved")}
-            type="button"
-          >
-            Saved Test Cases
-          </button>
-        </div>
-
-        {(error || message) && (
-          <div className="mt-4">
-            {error && <p className="text-sm font-medium text-red-600">{error}</p>}
-            {message && <p className="text-sm font-medium text-emerald-700">{message}</p>}
-          </div>
-        )}
-
-        {activeView === "generator" && (
-          <>
-            <div className="mb-6 mt-8">
-              <h2 className="text-2xl font-bold text-slate-950">Generate QA test cases</h2>
-              <p className="mt-1 max-w-3xl text-slate-600">
-                Enter a feature description and TestMate will create rule-based cases for login,
-                registration, payment, or a generic QA workflow.
-              </p>
+      <main className="ml-[260px] min-h-screen bg-slate-50">
+        <div className="mx-auto max-w-[1200px] p-8">
+          <header className="mb-8 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h1 className="text-2xl font-bold text-slate-950">{pageDetails[activeView].title}</h1>
+                <p className="mt-1 max-w-2xl text-sm text-slate-600">{pageDetails[activeView].helper}</p>
+              </div>
+              <div className="inline-flex w-fit rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700">
+                {user.name}
+              </div>
             </div>
+          </header>
 
-            <form
-              className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 md:grid-cols-2"
-              onSubmit={handleGenerate}
-            >
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-slate-700">Project name</span>
-                <input
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-slate-950 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
-                  name="projectName"
-                  onChange={updateForm}
-                  required
-                  type="text"
-                  value={form.projectName}
-                />
-              </label>
+          {(error || message) && (
+            <div className="mb-6 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+              {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+              {message && <p className="text-sm font-medium text-emerald-700">{message}</p>}
+            </div>
+          )}
 
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-slate-700">Module name</span>
-                <input
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-slate-950 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
-                  name="moduleName"
-                  onChange={updateForm}
-                  required
-                  type="text"
-                  value={form.moduleName}
-                />
-              </label>
-
-              <label className="space-y-2 md:col-span-2">
-                <span className="text-sm font-medium text-slate-700">Feature description</span>
-                <textarea
-                  className="min-h-28 w-full resize-y rounded-md border border-slate-300 px-3 py-2 text-slate-950 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
-                  name="featureDescription"
-                  onChange={updateForm}
-                  required
-                  value={form.featureDescription}
-                />
-              </label>
-
-              <label className="space-y-2">
-                <span className="text-sm font-medium text-slate-700">Number of test cases</span>
-                <input
-                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-slate-950 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
-                  max="50"
-                  min="1"
-                  name="numberOfTestCases"
-                  onChange={updateForm}
-                  required
-                  type="number"
-                  value={form.numberOfTestCases}
-                />
-              </label>
-
-              <div className="flex items-end">
-                <button
-                  className="w-full rounded-md bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-400 md:w-auto"
-                  disabled={isGenerating}
-                  type="submit"
-                >
-                  {isGenerating ? "Generating..." : "Generate test cases"}
-                </button>
-              </div>
-            </form>
-
-            <div className="mt-8 overflow-hidden rounded-lg border border-slate-200 bg-white">
-              <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold text-slate-950">Generated test cases</h3>
-                  <p className="text-sm text-slate-500">{generatedTestCases.length} total</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400"
-                    disabled={generatedTestCases.length === 0}
-                    onClick={() =>
-                      exportExcel(generatedTestCases, "generated-test-cases", "No generated test cases to export")
-                    }
-                    type="button"
-                  >
-                    Export to Excel
-                  </button>
-                  <button
-                    className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400"
-                    disabled={generatedTestCases.length === 0}
-                    onClick={() =>
-                      exportPdf(
-                        generatedTestCases,
-                        "generated-test-cases",
-                        "Generated Test Cases",
-                        "No generated test cases to export"
-                      )
-                    }
-                    type="button"
-                  >
-                    Export to PDF
-                  </button>
-                </div>
-              </div>
-
-              {generatedTestCases.length === 0 ? (
-                <p className="px-5 py-8 text-sm text-slate-600">
-                  No generated test cases yet. Generate a set from the form above.
+          {activeView === "generate" && (
+            <div className="space-y-6">
+              <section className="rounded-xl border border-emerald-100 bg-emerald-50 p-5 shadow-sm">
+                <h2 className="text-lg font-semibold text-emerald-950">Generate QA Test Cases</h2>
+                <p className="mt-1 text-sm text-emerald-800">
+                  Describe a feature and generate structured QA test cases instantly.
                 </p>
-              ) : (
-                <TestCasesTable
-                  editingCase={editingCase}
-                  editingId={editingId}
-                  onCancelEdit={cancelEditing}
-                  onDelete={handleDelete}
-                  onEdit={startEditing}
-                  onSave={handleSave}
-                  onUpdateEdit={handleUpdate}
-                  onUpdateEditingCase={updateEditingCase}
-                  showSave
-                  testCases={generatedTestCases}
-                />
-              )}
-            </div>
-          </>
-        )}
+              </section>
 
-        {activeView === "saved" && (
-          <div className="mt-8 overflow-hidden rounded-lg border border-slate-200 bg-white">
-            <div className="border-b border-slate-200 px-5 py-4">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-950">Saved Test Cases</h2>
+              <form
+                className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
+                onSubmit={handleGenerate}
+              >
+                <div className="grid gap-5 md:grid-cols-2">
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium text-slate-700">Project Name</span>
+                    <input
+                      className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                      name="projectName"
+                      onChange={updateForm}
+                      placeholder="Example: Online Banking App"
+                      required
+                      type="text"
+                      value={form.projectName}
+                    />
+                  </label>
+
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium text-slate-700">Module Name</span>
+                    <input
+                      className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                      name="moduleName"
+                      onChange={updateForm}
+                      placeholder="Example: Authentication"
+                      required
+                      type="text"
+                      value={form.moduleName}
+                    />
+                  </label>
+
+                  <label className="space-y-2 md:col-span-2">
+                    <span className="text-sm font-medium text-slate-700">Feature Description</span>
+                    <textarea
+                      className="min-h-32 w-full resize-y rounded-xl border border-slate-300 px-3 py-2.5 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                      name="featureDescription"
+                      onChange={updateForm}
+                      placeholder="Example: Login flow for users with valid and invalid credentials"
+                      required
+                      value={form.featureDescription}
+                    />
+                  </label>
+
+                  <div className="grid gap-4 md:col-span-2 md:grid-cols-[220px_auto] md:items-end">
+                    <label className="space-y-2">
+                      <span className="text-sm font-medium text-slate-700">Number of test cases</span>
+                      <input
+                        className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-slate-950 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                        max="50"
+                        min="1"
+                        name="numberOfTestCases"
+                        onChange={updateForm}
+                        required
+                        type="number"
+                        value={form.numberOfTestCases}
+                      />
+                    </label>
+
+                    <button
+                      className="w-full rounded-xl bg-emerald-700 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-400 md:w-fit"
+                      disabled={isGenerating}
+                      type="submit"
+                    >
+                      {isGenerating ? "Generating..." : "Generate test cases"}
+                    </button>
+                  </div>
+                </div>
+              </form>
+
+              <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="flex flex-col gap-3 border-b border-slate-200 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-950">Generated test cases</h2>
+                    <p className="text-sm text-slate-500">{generatedTestCases.length} total</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 disabled:hover:bg-white"
+                      disabled={generatedTestCases.length === 0}
+                      onClick={() =>
+                        exportExcel(generatedTestCases, "generated-test-cases", "No generated test cases to export")
+                      }
+                      type="button"
+                    >
+                      Export to Excel
+                    </button>
+                    <button
+                      className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 disabled:hover:bg-white"
+                      disabled={generatedTestCases.length === 0}
+                      onClick={() =>
+                        exportPdf(
+                          generatedTestCases,
+                          "generated-test-cases",
+                          "Generated Test Cases",
+                          "No generated test cases to export"
+                        )
+                      }
+                      type="button"
+                    >
+                      Export to PDF
+                    </button>
+                  </div>
+                </div>
+
+                {generatedTestCases.length === 0 ? (
+                  <div className="px-6 py-12 text-sm text-slate-600">
+                    No generated test cases yet. Fill in the form above and click Generate test cases.
+                  </div>
+                ) : (
+                  <TestCasesTable
+                    editingCase={editingCase}
+                    editingId={editingId}
+                    onCancelEdit={cancelEditing}
+                    onDelete={handleDelete}
+                    onEdit={startEditing}
+                    onSave={handleSave}
+                    onUpdateEdit={handleUpdate}
+                    onUpdateEditingCase={updateEditingCase}
+                    showSave
+                    testCases={generatedTestCases}
+                  />
+                )}
+              </section>
+            </div>
+          )}
+
+          {activeView === "saved" && (
+            <div className="space-y-6">
+              <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <h2 className="text-lg font-semibold text-slate-950">Search and filters</h2>
+                    <p className="text-sm text-slate-500">Filter saved cases, select rows, then export.</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 disabled:hover:bg-white"
+                      disabled={selectedSavedTestCases.length === 0}
+                      onClick={() =>
+                        exportExcel(selectedSavedTestCases, "saved-test-cases", "Select saved test cases to export")
+                      }
+                      type="button"
+                    >
+                      Export selected to Excel
+                    </button>
+                    <button
+                      className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 disabled:hover:bg-white"
+                      disabled={selectedSavedTestCases.length === 0}
+                      onClick={() =>
+                        exportPdf(
+                          selectedSavedTestCases,
+                          "saved-test-cases",
+                          "Saved Test Cases Report",
+                          "Select saved test cases to export"
+                        )
+                      }
+                      type="button"
+                    >
+                      Export selected to PDF
+                    </button>
+                  </div>
+                </div>
+
+                <div className="mt-5 grid gap-4 lg:grid-cols-[1.5fr_1fr_1fr_auto]">
+                  <input
+                    className="rounded-xl border border-slate-300 px-3 py-2.5 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                    name="search"
+                    onChange={updateFilters}
+                    placeholder="Search project, module, or scenario"
+                    type="search"
+                    value={filters.search}
+                  />
+                  <select
+                    className="rounded-xl border border-slate-300 px-3 py-2.5 text-slate-700 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                    name="priority"
+                    onChange={updateFilters}
+                    value={filters.priority}
+                  >
+                    <option value="">All priorities</option>
+                    {priorities.map((priority) => (
+                      <option key={priority} value={priority}>
+                        {priority}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    className="rounded-xl border border-slate-300 px-3 py-2.5 text-slate-700 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
+                    name="moduleName"
+                    onChange={updateFilters}
+                    value={filters.moduleName}
+                  >
+                    <option value="">All modules</option>
+                    {moduleOptions.map((moduleName) => (
+                      <option key={moduleName} value={moduleName}>
+                        {moduleName}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                    onClick={clearFilters}
+                    type="button"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </section>
+
+              <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                <div className="border-b border-slate-200 px-6 py-5">
+                  <h2 className="text-lg font-semibold text-slate-950">Saved test cases</h2>
                   <p className="text-sm text-slate-500">
                     {filteredSavedTestCases.length} shown, {selectedSavedIds.length} selected
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400"
-                    disabled={selectedSavedTestCases.length === 0}
-                    onClick={() =>
-                      exportExcel(selectedSavedTestCases, "saved-test-cases", "Select saved test cases to export")
-                    }
-                    type="button"
-                  >
-                    Export selected to Excel
-                  </button>
-                  <button
-                    className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400"
-                    disabled={selectedSavedTestCases.length === 0}
-                    onClick={() =>
-                      exportPdf(
-                        selectedSavedTestCases,
-                        "saved-test-cases",
-                        "Saved Test Cases Report",
-                        "Select saved test cases to export"
-                      )
-                    }
-                    type="button"
-                  >
-                    Export selected to PDF
-                  </button>
-                </div>
-              </div>
 
-              <div className="mt-4 grid gap-3 lg:grid-cols-[1.5fr_1fr_1fr_auto]">
-                <input
-                  className="rounded-md border border-slate-300 px-3 py-2 text-slate-950 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
-                  name="search"
-                  onChange={updateFilters}
-                  placeholder="Search project, module, or scenario"
-                  type="search"
-                  value={filters.search}
-                />
-                <select
-                  className="rounded-md border border-slate-300 px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
-                  name="priority"
-                  onChange={updateFilters}
-                  value={filters.priority}
-                >
-                  <option value="">All priorities</option>
-                  {priorities.map((priority) => (
-                    <option key={priority} value={priority}>
-                      {priority}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  className="rounded-md border border-slate-300 px-3 py-2 text-slate-700 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
-                  name="moduleName"
-                  onChange={updateFilters}
-                  value={filters.moduleName}
-                >
-                  <option value="">All modules</option>
-                  {moduleOptions.map((moduleName) => (
-                    <option key={moduleName} value={moduleName}>
-                      {moduleName}
-                    </option>
-                  ))}
-                </select>
-                <button
-                  className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
-                  onClick={clearFilters}
-                  type="button"
-                >
-                  Clear
-                </button>
-              </div>
+                {savedTestCases.length === 0 ? (
+                  <div className="px-6 py-12 text-sm text-slate-600">
+                    No saved test cases yet. Save generated test cases to build this list.
+                  </div>
+                ) : filteredSavedTestCases.length === 0 ? (
+                  <div className="px-6 py-12 text-sm text-slate-600">
+                    No saved test cases match the current filters.
+                  </div>
+                ) : (
+                  <TestCasesTable
+                    editingCase={editingCase}
+                    editingId={editingId}
+                    onCancelEdit={cancelEditing}
+                    onDelete={handleDelete}
+                    onEdit={startEditing}
+                    onToggleAll={toggleAllVisibleSaved}
+                    onToggleSelected={toggleSavedSelection}
+                    onUpdateEdit={handleUpdate}
+                    onUpdateEditingCase={updateEditingCase}
+                    selectable
+                    selectedIds={selectedSavedIds}
+                    testCases={filteredSavedTestCases}
+                  />
+                )}
+              </section>
             </div>
+          )}
 
-            {savedTestCases.length === 0 ? (
-              <p className="px-5 py-8 text-sm text-slate-600">
-                No saved test cases yet. Save generated test cases to build this list.
-              </p>
-            ) : filteredSavedTestCases.length === 0 ? (
-              <p className="px-5 py-8 text-sm text-slate-600">No saved test cases match the current filters.</p>
-            ) : (
-              <TestCasesTable
-                editingCase={editingCase}
-                editingId={editingId}
-                onCancelEdit={cancelEditing}
-                onDelete={handleDelete}
-                onEdit={startEditing}
-                onToggleAll={toggleAllVisibleSaved}
-                onToggleSelected={toggleSavedSelection}
-                onUpdateEdit={handleUpdate}
-                onUpdateEditingCase={updateEditingCase}
-                selectable
-                selectedIds={selectedSavedIds}
-                testCases={filteredSavedTestCases}
-              />
-            )}
-          </div>
-        )}
-      </section>
-    </main>
+          {activeView === "dashboard" && (
+            <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                <p className="text-sm font-medium text-slate-500">Total saved test cases</p>
+                <p className="mt-3 text-3xl font-bold text-slate-950">{savedSummary.total}</p>
+                <p className="mt-3 text-sm text-slate-500">All saved cases available for review and export.</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                <p className="text-sm font-medium text-slate-500">High priority test cases</p>
+                <p className="mt-3 text-3xl font-bold text-slate-950">{savedSummary.High}</p>
+                <p className="mt-3 text-sm text-slate-500">Critical scenarios that should be tested first.</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                <p className="text-sm font-medium text-slate-500">Medium priority test cases</p>
+                <p className="mt-3 text-3xl font-bold text-slate-950">{savedSummary.Medium}</p>
+                <p className="mt-3 text-sm text-slate-500">Important coverage for common user workflows.</p>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+                <p className="text-sm font-medium text-slate-500">Low priority test cases</p>
+                <p className="mt-3 text-3xl font-bold text-slate-950">{savedSummary.Low}</p>
+                <p className="mt-3 text-sm text-slate-500">Lower-risk checks for broader QA completeness.</p>
+              </div>
+            </section>
+          )}
+        </div>
+      </main>
+    </div>
   );
 };
 
