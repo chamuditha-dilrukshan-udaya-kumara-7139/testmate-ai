@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { jsPDF } from "jspdf";
 import * as XLSX from "xlsx";
 import api from "../api/client.js";
+import testmateLogo from "../assets/testmate-logo.png";
 
 const initialForm = {
   projectName: "",
@@ -47,6 +48,80 @@ const getExportFileName = (testCases, extension, prefix = "test-cases") => {
   const cleanProjectName = projectName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
   return `${cleanProjectName || prefix}-${prefix}.${extension}`;
+};
+
+const getPriorityBadgeClass = (priority) => {
+  const classes = {
+    High: "bg-red-50 text-red-700 ring-red-100",
+    Medium: "bg-amber-50 text-amber-700 ring-amber-100",
+    Low: "bg-emerald-50 text-emerald-700 ring-emerald-100"
+  };
+
+  return classes[priority] || "bg-slate-50 text-slate-700 ring-slate-100";
+};
+
+const GeneratorIllustration = () => (
+  <svg
+    aria-hidden="true"
+    className="h-32 w-40 shrink-0"
+    fill="none"
+    viewBox="0 0 180 140"
+    xmlns="http://www.w3.org/2000/svg"
+  >
+    <rect height="96" rx="18" width="126" x="28" y="22" fill="#ECFDF5" />
+    <rect height="72" rx="12" width="92" x="44" y="38" fill="white" stroke="#10B981" strokeWidth="3" />
+    <path d="M58 58h45M58 74h62M58 90h34" stroke="#334155" strokeLinecap="round" strokeWidth="5" />
+    <circle cx="138" cy="38" fill="#14B8A6" r="16" />
+    <path d="M132 38l4 4 8-9" stroke="white" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
+    <path d="M28 116c18-9 34-8 48 2 18 13 38 13 62-1" stroke="#A7F3D0" strokeLinecap="round" strokeWidth="6" />
+  </svg>
+);
+
+const EmptyStateIllustration = ({ accent = "emerald" }) => {
+  const colors = {
+    emerald: { bg: "#ECFDF5", stroke: "#10B981", soft: "#A7F3D0" },
+    teal: { bg: "#F0FDFA", stroke: "#14B8A6", soft: "#99F6E4" }
+  };
+  const color = colors[accent] || colors.emerald;
+
+  return (
+    <svg
+      aria-hidden="true"
+      className="mx-auto h-28 w-36"
+      fill="none"
+      viewBox="0 0 160 120"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <rect height="74" rx="16" width="104" x="28" y="22" fill={color.bg} />
+      <rect height="52" rx="10" width="76" x="42" y="36" fill="white" stroke={color.stroke} strokeWidth="3" />
+      <path d="M55 53h46M55 66h34M55 79h50" stroke="#64748B" strokeLinecap="round" strokeWidth="4" />
+      <circle cx="124" cy="28" fill={color.soft} r="10" />
+      <path d="M31 100c22-8 44-8 66 0 12 4 23 4 34-1" stroke={color.soft} strokeLinecap="round" strokeWidth="5" />
+    </svg>
+  );
+};
+
+const SummaryIcon = ({ tone }) => {
+  const tones = {
+    total: "bg-sky-50 text-sky-700 ring-sky-100",
+    high: "bg-red-50 text-red-700 ring-red-100",
+    medium: "bg-amber-50 text-amber-700 ring-amber-100",
+    low: "bg-emerald-50 text-emerald-700 ring-emerald-100"
+  };
+
+  return (
+    <div className={`flex h-11 w-11 items-center justify-center rounded-xl ring-1 ${tones[tone]}`}>
+      <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24">
+        <path
+          d="M7 7h10M7 12h10M7 17h6"
+          stroke="currentColor"
+          strokeLinecap="round"
+          strokeWidth="2"
+        />
+        <rect height="18" rx="3" stroke="currentColor" strokeWidth="2" width="14" x="5" y="3" />
+      </svg>
+    </div>
+  );
 };
 
 const createExcelExport = (testCases, filePrefix) => {
@@ -193,7 +268,7 @@ const TestCasesTable = ({
   return (
     <div className="overflow-x-auto">
       <table className="min-w-[1320px] table-fixed border-collapse text-left text-sm">
-        <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+        <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
           <tr>
             {selectable && (
               <th className="w-12 px-4 py-3 font-semibold">
@@ -309,7 +384,7 @@ const TestCasesTable = ({
                       ))}
                     </select>
                   ) : (
-                    <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-700">
+                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${getPriorityBadgeClass(testCase.priority)}`}>
                       {testCase.priority}
                     </span>
                   )}
@@ -636,13 +711,15 @@ const Dashboard = ({ user, onLogout }) => {
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900">
       <aside className="fixed left-0 top-0 z-30 flex h-screen w-[260px] flex-col border-r border-slate-200 bg-white p-6">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-700 text-sm font-bold text-white shadow-sm">
-            TM
-          </div>
-          <div>
-            <p className="text-lg font-bold leading-6 text-slate-950">TestMate AI</p>
-            <p className="text-sm leading-5 text-slate-500">QA Test Case Generator</p>
+        <div className="flex items-center gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-3">
+          <img
+            alt="TestMate AI logo"
+            className="h-14 w-14 shrink-0 rounded-xl object-contain shadow-sm"
+            src={testmateLogo}
+          />
+          <div className="min-w-0">
+            <p className="text-lg font-extrabold leading-6 tracking-tight text-slate-950">TestMate AI</p>
+            <p className="text-xs font-medium leading-5 text-slate-500">QA Test Case Generator</p>
           </div>
         </div>
 
@@ -674,7 +751,7 @@ const Dashboard = ({ user, onLogout }) => {
 
       <main className="ml-[260px] min-h-screen bg-slate-50">
         <div className="mx-auto max-w-[1200px] p-8">
-          <header className="mb-8 rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+          <header className="mb-8 rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h1 className="text-2xl font-bold text-slate-950">{pageDetails[activeView].title}</h1>
@@ -694,16 +771,22 @@ const Dashboard = ({ user, onLogout }) => {
           )}
 
           {activeView === "generate" && (
-            <div className="space-y-6">
-              <section className="rounded-xl border border-emerald-100 bg-emerald-50 p-5 shadow-sm">
-                <h2 className="text-lg font-semibold text-emerald-950">Generate QA Test Cases</h2>
-                <p className="mt-1 text-sm text-emerald-800">
-                  Describe a feature and generate structured QA test cases instantly.
-                </p>
+            <div className="animate-fade-in space-y-6">
+              <section className="flex items-center justify-between gap-6 overflow-hidden rounded-xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-teal-50 to-sky-50 p-6 shadow-sm transition hover:shadow-md">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Start here</p>
+                  <h2 className="mt-2 text-xl font-bold text-slate-950">Generate QA Test Cases</h2>
+                  <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
+                    Describe a feature and generate structured QA test cases instantly.
+                  </p>
+                </div>
+                <div className="hidden md:block">
+                  <GeneratorIllustration />
+                </div>
               </section>
 
               <form
-                className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm"
+                className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md"
                 onSubmit={handleGenerate}
               >
                 <div className="grid gap-5 md:grid-cols-2">
@@ -761,17 +844,20 @@ const Dashboard = ({ user, onLogout }) => {
                     </label>
 
                     <button
-                      className="w-full rounded-xl bg-emerald-700 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-400 md:w-fit"
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-400 md:w-fit"
                       disabled={isGenerating}
                       type="submit"
                     >
+                      {isGenerating && (
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                      )}
                       {isGenerating ? "Generating..." : "Generate test cases"}
                     </button>
                   </div>
                 </div>
               </form>
 
-              <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md">
                 <div className="flex flex-col gap-3 border-b border-slate-200 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h2 className="text-lg font-semibold text-slate-950">Generated test cases</h2>
@@ -807,8 +893,12 @@ const Dashboard = ({ user, onLogout }) => {
                 </div>
 
                 {generatedTestCases.length === 0 ? (
-                  <div className="px-6 py-12 text-sm text-slate-600">
-                    No generated test cases yet. Fill in the form above and click Generate test cases.
+                  <div className="px-6 py-12 text-center">
+                    <EmptyStateIllustration />
+                    <h3 className="mt-4 text-sm font-semibold text-slate-900">No generated test cases yet</h3>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Fill in the form above and click Generate test cases.
+                    </p>
                   </div>
                 ) : (
                   <TestCasesTable
@@ -829,16 +919,16 @@ const Dashboard = ({ user, onLogout }) => {
           )}
 
           {activeView === "saved" && (
-            <div className="space-y-6">
-              <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
+            <div className="animate-fade-in space-y-6">
+              <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div>
                     <h2 className="text-lg font-semibold text-slate-950">Search and filters</h2>
-                    <p className="text-sm text-slate-500">Filter saved cases, select rows, then export.</p>
+                    <p className="mt-1 text-sm text-slate-500">Filter saved cases, select rows, then export.</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <button
-                      className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 disabled:hover:bg-white"
+                      className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-800 shadow-sm transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-white disabled:text-slate-400"
                       disabled={selectedSavedTestCases.length === 0}
                       onClick={() =>
                         exportExcel(selectedSavedTestCases, "saved-test-cases", "Select saved test cases to export")
@@ -848,7 +938,7 @@ const Dashboard = ({ user, onLogout }) => {
                       Export selected to Excel
                     </button>
                     <button
-                      className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 disabled:hover:bg-white"
+                      className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm font-semibold text-sky-800 shadow-sm transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-white disabled:text-slate-400"
                       disabled={selectedSavedTestCases.length === 0}
                       onClick={() =>
                         exportPdf(
@@ -910,7 +1000,7 @@ const Dashboard = ({ user, onLogout }) => {
                 </div>
               </section>
 
-              <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+              <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md">
                 <div className="border-b border-slate-200 px-6 py-5">
                   <h2 className="text-lg font-semibold text-slate-950">Saved test cases</h2>
                   <p className="text-sm text-slate-500">
@@ -919,12 +1009,20 @@ const Dashboard = ({ user, onLogout }) => {
                 </div>
 
                 {savedTestCases.length === 0 ? (
-                  <div className="px-6 py-12 text-sm text-slate-600">
-                    No saved test cases yet. Save generated test cases to build this list.
+                  <div className="px-6 py-12 text-center">
+                    <EmptyStateIllustration accent="teal" />
+                    <h3 className="mt-4 text-sm font-semibold text-slate-900">No saved test cases yet</h3>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Save generated test cases to build your reusable QA library.
+                    </p>
                   </div>
                 ) : filteredSavedTestCases.length === 0 ? (
-                  <div className="px-6 py-12 text-sm text-slate-600">
-                    No saved test cases match the current filters.
+                  <div className="px-6 py-12 text-center">
+                    <EmptyStateIllustration accent="teal" />
+                    <h3 className="mt-4 text-sm font-semibold text-slate-900">No matching test cases</h3>
+                    <p className="mt-1 text-sm text-slate-500">
+                      Try changing the search text, priority, or module filter.
+                    </p>
                   </div>
                 ) : (
                   <TestCasesTable
@@ -947,24 +1045,28 @@ const Dashboard = ({ user, onLogout }) => {
           )}
 
           {activeView === "dashboard" && (
-            <section className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <p className="text-sm font-medium text-slate-500">Total saved test cases</p>
+            <section className="grid animate-fade-in gap-5 md:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                <SummaryIcon tone="total" />
+                <p className="mt-5 text-sm font-medium text-slate-500">Total saved test cases</p>
                 <p className="mt-3 text-3xl font-bold text-slate-950">{savedSummary.total}</p>
                 <p className="mt-3 text-sm text-slate-500">All saved cases available for review and export.</p>
               </div>
-              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <p className="text-sm font-medium text-slate-500">High priority test cases</p>
+              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                <SummaryIcon tone="high" />
+                <p className="mt-5 text-sm font-medium text-slate-500">High priority test cases</p>
                 <p className="mt-3 text-3xl font-bold text-slate-950">{savedSummary.High}</p>
                 <p className="mt-3 text-sm text-slate-500">Critical scenarios that should be tested first.</p>
               </div>
-              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <p className="text-sm font-medium text-slate-500">Medium priority test cases</p>
+              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                <SummaryIcon tone="medium" />
+                <p className="mt-5 text-sm font-medium text-slate-500">Medium priority test cases</p>
                 <p className="mt-3 text-3xl font-bold text-slate-950">{savedSummary.Medium}</p>
                 <p className="mt-3 text-sm text-slate-500">Important coverage for common user workflows.</p>
               </div>
-              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-                <p className="text-sm font-medium text-slate-500">Low priority test cases</p>
+              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+                <SummaryIcon tone="low" />
+                <p className="mt-5 text-sm font-medium text-slate-500">Low priority test cases</p>
                 <p className="mt-3 text-3xl font-bold text-slate-950">{savedSummary.Low}</p>
                 <p className="mt-3 text-sm text-slate-500">Lower-risk checks for broader QA completeness.</p>
               </div>
