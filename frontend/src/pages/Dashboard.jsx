@@ -73,44 +73,67 @@ const createPdfExport = (testCases, filePrefix, title) => {
   const rows = getExportRows(testCases);
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 10;
-  const rowPadding = 2;
-  const lineHeight = 4.5;
+  const margin = 12;
+  const rowPadding = 2.5;
+  const lineHeight = 4.8;
+  const tableTop = 34;
+  const footerTop = pageHeight - 8;
+  const generatedDate = new Date().toLocaleDateString();
+  const projectNames = [...new Set(testCases.map((testCase) => testCase.projectName).filter(Boolean))];
+  const projectName = projectNames.length === 1 ? projectNames[0] : "Multiple Projects";
   const columns = [
-    { label: "Project Name", width: 28 },
-    { label: "Module Name", width: 28 },
+    { label: "Project Name", width: 30 },
+    { label: "Module Name", width: 30 },
     { label: "Test Case ID", width: 22 },
-    { label: "Test Scenario", width: 48 },
-    { label: "Test Steps", width: 65 },
+    { label: "Test Scenario", width: 52 },
+    { label: "Test Steps", width: 58 },
     { label: "Expected Result", width: 65 },
-    { label: "Priority", width: 18 }
+    { label: "Priority", width: 20 }
   ];
 
-  const drawHeader = () => {
+  const drawReportHeader = () => {
+    doc.setTextColor(15, 23, 42);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text(title, margin, margin);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text(`Project Name: ${projectName}`, margin, margin + 7);
+    doc.text(`Generated Date: ${generatedDate}`, margin, margin + 13);
+    doc.text(`Total Records: ${testCases.length}`, pageWidth / 2, margin + 7);
+  };
+
+  const drawTableHeader = () => {
     let x = margin;
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
-    doc.setFillColor(241, 245, 249);
+    doc.setLineWidth(0.2);
 
     columns.forEach((column) => {
-      doc.rect(x, margin + 12, column.width, 9, "F");
-      doc.text(column.label, x + rowPadding, margin + 18);
+      doc.setFillColor(241, 245, 249);
+      doc.setDrawColor(203, 213, 225);
+      doc.rect(x, tableTop - 9, column.width, 9, "FD");
+      doc.setTextColor(15, 23, 42);
+      doc.text(column.label, x + rowPadding, tableTop - 3.2);
       x += column.width;
     });
   };
 
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(14);
-  doc.text(title, margin, margin);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.text(`Project: ${testCases[0]?.projectName || "Multiple"}`, margin, margin + 6);
-  doc.text(`Records: ${testCases.length}`, pageWidth / 2, margin + 6);
-  drawHeader();
+  const drawPageHeader = () => {
+    drawReportHeader();
+    drawTableHeader();
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(30, 41, 59);
+    doc.setDrawColor(203, 213, 225);
+  };
 
-  let y = margin + 25;
+  drawPageHeader();
+
+  let y = tableTop;
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
+  doc.setFontSize(8.5);
 
   rows.forEach((row) => {
     const wrappedCells = columns.map((column) =>
@@ -118,22 +141,33 @@ const createPdfExport = (testCases, filePrefix, title) => {
     );
     const rowHeight = Math.max(...wrappedCells.map((cell) => cell.length)) * lineHeight + rowPadding * 2;
 
-    if (y + rowHeight > pageHeight - margin) {
+    if (y + rowHeight > footerTop - 4) {
       doc.addPage();
-      drawHeader();
-      y = margin + 25;
+      drawPageHeader();
+      y = tableTop;
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(8);
+      doc.setFontSize(8.5);
     }
 
     let x = margin;
     wrappedCells.forEach((cell, index) => {
       doc.rect(x, y, columns[index].width, rowHeight);
-      doc.text(cell, x + rowPadding, y + rowPadding + 3);
+      doc.text(cell, x + rowPadding, y + rowPadding + 3.2);
       x += columns[index].width;
     });
     y += rowHeight;
   });
+
+  const totalPages = doc.getNumberOfPages();
+  if (totalPages > 1) {
+    for (let pageNumber = 1; pageNumber <= totalPages; pageNumber += 1) {
+      doc.setPage(pageNumber);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(71, 85, 105);
+      doc.text(`Page ${pageNumber} of ${totalPages}`, pageWidth - margin, footerTop, { align: "right" });
+    }
+  }
 
   doc.save(getExportFileName(testCases, "pdf", filePrefix));
 };
@@ -808,7 +842,7 @@ const Dashboard = ({ user, onLogout }) => {
                       exportPdf(
                         selectedSavedTestCases,
                         "saved-test-cases",
-                        "Saved Test Cases",
+                        "Saved Test Cases Report",
                         "Select saved test cases to export"
                       )
                     }
