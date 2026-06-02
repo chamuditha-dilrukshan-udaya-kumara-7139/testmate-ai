@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { jsPDF } from "jspdf";
+import * as XLSX from "xlsx";
 import api from "../api/client.js";
 
 const initialForm = {
@@ -9,6 +11,37 @@ const initialForm = {
 };
 
 const priorities = ["High", "Medium", "Low"];
+
+const exportColumns = [
+  "Project Name",
+  "Module Name",
+  "Test Case ID",
+  "Test Scenario",
+  "Test Steps",
+  "Expected Result",
+  "Priority"
+];
+
+const formatSteps = (steps) =>
+  steps.map((step, index) => `${index + 1}. ${step}`).join("\n");
+
+const getExportRows = (testCases) =>
+  testCases.map((testCase) => ({
+    "Project Name": testCase.projectName,
+    "Module Name": testCase.moduleName,
+    "Test Case ID": testCase.testCaseId,
+    "Test Scenario": testCase.testScenario,
+    "Test Steps": formatSteps(testCase.testSteps),
+    "Expected Result": testCase.expectedResult,
+    Priority: testCase.priority
+  }));
+
+const getExportFileName = (testCases, extension) => {
+  const projectName = testCases[0]?.projectName || "test-cases";
+  const cleanProjectName = projectName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+  return `${cleanProjectName || "test-cases"}-test-cases.${extension}`;
+};
 
 const Dashboard = ({ user, onLogout }) => {
   const [form, setForm] = useState(initialForm);
@@ -137,6 +170,100 @@ const Dashboard = ({ user, onLogout }) => {
     }
   };
 
+  const handleExportExcel = () => {
+    const worksheet = XLSX.utils.json_to_sheet(getExportRows(testCases), {
+      header: exportColumns
+    });
+    worksheet["!cols"] = [
+      { wch: 22 },
+      { wch: 22 },
+      { wch: 14 },
+      { wch: 36 },
+      { wch: 48 },
+      { wch: 42 },
+      { wch: 12 }
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Test Cases");
+    XLSX.writeFile(workbook, getExportFileName(testCases, "xlsx"));
+    setMessage("Excel export downloaded.");
+    setError("");
+  };
+
+  const handleExportPdf = () => {
+    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    const rows = getExportRows(testCases);
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 10;
+    const rowPadding = 2;
+    const lineHeight = 4.5;
+    const columns = [
+      { label: "Project Name", width: 28 },
+      { label: "Module Name", width: 28 },
+      { label: "Test Case ID", width: 22 },
+      { label: "Test Scenario", width: 48 },
+      { label: "Test Steps", width: 65 },
+      { label: "Expected Result", width: 65 },
+      { label: "Priority", width: 18 }
+    ];
+
+    const drawHeader = () => {
+      let x = margin;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.setFillColor(241, 245, 249);
+
+      columns.forEach((column) => {
+        doc.rect(x, margin + 12, column.width, 9, "F");
+        doc.text(column.label, x + rowPadding, margin + 18);
+        x += column.width;
+      });
+    };
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(14);
+    doc.text("Generated Test Cases", margin, margin);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text(`Project: ${testCases[0]?.projectName || "N/A"}`, margin, margin + 6);
+    doc.text(`Module: ${testCases[0]?.moduleName || "N/A"}`, pageWidth / 2, margin + 6);
+    drawHeader();
+
+    let y = margin + 25;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+
+    rows.forEach((row) => {
+      const wrappedCells = columns.map((column) =>
+        doc.splitTextToSize(String(row[column.label] || ""), column.width - rowPadding * 2)
+      );
+      const rowHeight =
+        Math.max(...wrappedCells.map((cell) => cell.length)) * lineHeight + rowPadding * 2;
+
+      if (y + rowHeight > pageHeight - margin) {
+        doc.addPage();
+        drawHeader();
+        y = margin + 25;
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+      }
+
+      let x = margin;
+      wrappedCells.forEach((cell, index) => {
+        doc.rect(x, y, columns[index].width, rowHeight);
+        doc.text(cell, x + rowPadding, y + rowPadding + 3);
+        x += columns[index].width;
+      });
+      y += rowHeight;
+    });
+
+    doc.save(getExportFileName(testCases, "pdf"));
+    setMessage("PDF export downloaded.");
+    setError("");
+  };
+
   return (
     <main className="min-h-screen bg-slate-50">
       <header className="border-b border-slate-200 bg-white">
@@ -240,8 +367,28 @@ const Dashboard = ({ user, onLogout }) => {
 
         <div className="mt-8 overflow-hidden rounded-lg border border-slate-200 bg-white">
           <div className="flex flex-col gap-1 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-            <h3 className="text-lg font-semibold text-slate-950">Generated test cases</h3>
-            <p className="text-sm text-slate-500">{testCases.length} total</p>
+            <div>
+              <h3 className="text-lg font-semibold text-slate-950">Generated test cases</h3>
+              <p className="text-sm text-slate-500">{testCases.length} total</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400"
+                disabled={testCases.length === 0}
+                onClick={handleExportExcel}
+                type="button"
+              >
+                Export to Excel
+              </button>
+              <button
+                className="rounded-md border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:text-slate-400"
+                disabled={testCases.length === 0}
+                onClick={handleExportPdf}
+                type="button"
+              >
+                Export to PDF
+              </button>
+            </div>
           </div>
 
           {testCases.length === 0 ? (
