@@ -535,14 +535,29 @@ const BugReportsTable = ({
   onCancelEdit,
   onDelete,
   onEdit,
+  onToggleAll,
+  onToggleSelected,
   onUpdate,
   onUpdateEditingBug,
-  projects
-}) => (
-  <div className="overflow-x-auto">
-    <table className="min-w-[1500px] table-fixed border-collapse text-left text-sm table-dark w-full">
+  projects,
+  selectedIds = []
+}) => {
+  const allSelected = bugReports.length > 0 && bugReports.every((bug) => selectedIds.includes(bug.id));
+
+  return (
+    <div className="overflow-x-auto">
+    <table className="min-w-[1540px] table-fixed border-collapse text-left text-sm table-dark w-full">
       <thead>
         <tr>
+          <th className="w-12 px-5 py-4">
+            <input
+              className="h-4 w-4 rounded border-0 cursor-pointer"
+              style={{ accentColor: "#22c55e" }}
+              checked={allSelected}
+              onChange={onToggleAll}
+              type="checkbox"
+            />
+          </th>
           <th className="w-36 px-5 py-4">Project</th>
           <th className="w-32 px-5 py-4">Module</th>
           <th className="w-28 px-5 py-4">Bug ID</th>
@@ -565,6 +580,15 @@ const BugReportsTable = ({
 
           return (
             <tr key={bug.id} className="align-top transition-colors duration-150">
+              <td className="px-5 py-4">
+                <input
+                  className="h-4 w-4 rounded cursor-pointer"
+                  style={{ accentColor: "#22c55e" }}
+                  checked={selectedIds.includes(bug.id)}
+                  onChange={() => onToggleSelected(bug.id)}
+                  type="checkbox"
+                />
+              </td>
               <td className="px-5 py-4">
                 {isEditing ? (
                   <select className="input-dark text-xs" name="projectId" onChange={onUpdateEditingBug} value={editingBug.projectId || ""}>
@@ -610,7 +634,8 @@ const BugReportsTable = ({
       </tbody>
     </table>
   </div>
-);
+  );
+};
 
 /* ────────────────────────────────────────────────────────────────
    Stat Card
@@ -725,6 +750,7 @@ const Dashboard = ({ user, onLogout }) => {
   const [editingBugId, setEditingBugId] = useState("");
   const [editingBug, setEditingBug] = useState(null);
   const [selectedSavedIds, setSelectedSavedIds] = useState([]);
+  const [selectedBugIds, setSelectedBugIds] = useState([]);
   const [filters, setFilters] = useState(initialFilters);
   const [editingId, setEditingId] = useState("");
   const [editingCase, setEditingCase] = useState(null);
@@ -741,6 +767,7 @@ const Dashboard = ({ user, onLogout }) => {
     savingBug: false,
     updatingBug: false,
     deletingBugId: "",
+    bulkDeletingBugs: false,
     exporting: ""
   });
   const [message, setMessage] = useState("");
@@ -1233,6 +1260,7 @@ const Dashboard = ({ user, onLogout }) => {
     try {
       await api.delete(`/bugs/${bug.id}`);
       setSavedBugReports((cur) => cur.filter((item) => item.id !== bug.id));
+      setSelectedBugIds((cur) => cur.filter((id) => id !== bug.id));
       toast.success("Bug report deleted successfully");
     } catch (err) {
       const errorMessage = getErrorMessage(err, "Failed to delete bug report");
@@ -1240,6 +1268,44 @@ const Dashboard = ({ user, onLogout }) => {
       toast.error("Failed to delete bug report");
     } finally {
       setLoadingFlag("deletingBugId", "");
+    }
+  };
+
+  const toggleBugSelection = (id) => {
+    setSelectedBugIds((cur) => cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]);
+  };
+
+  const toggleAllVisibleBugs = () => {
+    const visible = filteredBugReports.map((bug) => bug.id);
+    const allSelected = visible.length > 0 && visible.every((id) => selectedBugIds.includes(id));
+    setSelectedBugIds((cur) => allSelected ? cur.filter((id) => !visible.includes(id)) : [...new Set([...cur, ...visible])]);
+  };
+
+  const handleDeleteSelectedBugReports = async () => {
+    if (!selectedBugIds.length) {
+      return;
+    }
+
+    const confirmed = window.confirm("Are you sure you want to delete selected bug reports?");
+
+    if (!confirmed) {
+      return;
+    }
+
+    setError(""); setMessage("");
+    setLoadingFlag("bulkDeletingBugs", true);
+
+    try {
+      await api.delete("/bugs", { data: { ids: selectedBugIds } });
+      await loadBugReports();
+      setSelectedBugIds([]);
+      toast.success("Selected bug reports deleted successfully");
+    } catch (err) {
+      const errorMessage = getErrorMessage(err, "Failed to delete selected bug reports");
+      setError(errorMessage);
+      toast.error("Failed to delete selected bug reports");
+    } finally {
+      setLoadingFlag("bulkDeletingBugs", false);
     }
   };
 
@@ -1792,6 +1858,18 @@ const Dashboard = ({ user, onLogout }) => {
                     <p className="text-sm text-slate-500 mt-0.5">{filteredBugReports.length} shown</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
+                    <button
+                      className="btn-danger inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold"
+                      disabled={!selectedBugIds.length || loading.bulkDeletingBugs}
+                      onClick={handleDeleteSelectedBugReports}
+                      style={{
+                        cursor: !selectedBugIds.length || loading.bulkDeletingBugs ? "not-allowed" : "pointer",
+                        opacity: !selectedBugIds.length || loading.bulkDeletingBugs ? 0.5 : 1
+                      }}
+                      type="button"
+                    >
+                      {loading.bulkDeletingBugs ? <><span className="spinner" /> Deleting...</> : <><IconTrash /> Delete Selected</>}
+                    </button>
                     <ExportBtn icon={<IconExcel />} label="Export Excel" accent="green" disabled={!filteredBugReports.length} loading={loading.exporting === "excel:bugs"} onClick={exportBugExcel} />
                     <ExportBtn icon={<IconPdf />} label="Export PDF" accent="sky" disabled={!filteredBugReports.length} loading={loading.exporting === "pdf:bugs"} onClick={exportBugPdf} />
                   </div>
@@ -1824,9 +1902,12 @@ const Dashboard = ({ user, onLogout }) => {
                     onCancelEdit={cancelEditingBug}
                     onDelete={handleDeleteBugReport}
                     onEdit={startEditingBug}
+                    onToggleAll={toggleAllVisibleBugs}
+                    onToggleSelected={toggleBugSelection}
                     onUpdate={handleUpdateBugReport}
                     onUpdateEditingBug={updateEditingBug}
                     projects={projects}
+                    selectedIds={selectedBugIds}
                   />
                 )}
               </div>

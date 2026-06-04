@@ -196,3 +196,23 @@ export const deleteBugReport = async (req, res) => {
     res.status(500).json({ message: "Could not delete bug report" });
   }
 };
+
+export const deleteBugReports = async (req, res) => {
+  try {
+    const { ids } = req.body;
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: "Bug report ids are required" });
+    }
+
+    const result = await BugReport.deleteMany({
+      _id: { $in: ids },
+      user: req.user._id
+    });
+
+    res.json({ deletedCount: result.deletedCount });
+  } catch (error) {
+    console.error("Bulk delete bug reports failed:", error);
+    res.status(500).json({ message: "Could not delete selected bug reports" });
+  }
+};
