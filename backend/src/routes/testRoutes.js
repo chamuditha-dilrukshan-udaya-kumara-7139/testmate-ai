@@ -215,6 +215,26 @@ router.get("/", protect, (req, res) => {
   });
 });
 
+router.delete("/", protect, (req, res) => {
+  const { ids } = req.body;
+
+  if (!Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ message: "Test case ids are required" });
+  }
+
+  const idSet = new Set(ids.map(String));
+  const userCases = getUserCases(req.user.id);
+  const nextCases = userCases.filter((testCase) => !idSet.has(String(testCase.id)));
+  const deletedCount = userCases.length - nextCases.length;
+
+  setUserCases(req.user.id, nextCases);
+
+  res.json({
+    deletedCount,
+    tests: nextCases
+  });
+});
+
 router.post("/generate", protect, async (req, res) => {
   const { projectId, projectName, moduleName, featureDescription, numberOfTestCases } = req.body;
   const count = Number(numberOfTestCases);

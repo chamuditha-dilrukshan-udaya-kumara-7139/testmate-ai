@@ -28,11 +28,28 @@ const initialForm = {
 
 const initialProjectForm = { name: "", description: "" };
 const initialFilters = { search: "", priority: "", moduleName: "" };
+const initialBugForm = {
+  projectId: "",
+  moduleName: "",
+  bugSummary: "",
+  stepsOrNotes: "",
+  expectedResult: "",
+  actualResult: "",
+  environment: ""
+};
+const initialBugFilters = { search: "", severity: "", status: "" };
 const priorities = ["High", "Medium", "Low"];
+const severities = ["Critical", "High", "Medium", "Low"];
+const bugStatuses = ["Open", "In Progress", "Resolved", "Closed"];
 
 const exportColumns = [
   "Project Name", "Module Name", "Test Case ID",
   "Test Scenario", "Test Steps", "Expected Result", "Priority"
+];
+const bugExportColumns = [
+  "Project Name", "Module Name", "Bug ID", "Bug Title",
+  "Steps to Reproduce", "Expected Result", "Actual Result",
+  "Severity", "Priority", "Environment", "Status"
 ];
 
 /* ────────────────────────────────────────────────────────────────
@@ -73,6 +90,16 @@ const getPriorityBadgeClass = (priority) => {
     Low:    "bg-emerald-50 text-emerald-700 ring-emerald-100"
   };
   return classes[priority] || "bg-slate-50 text-slate-700 ring-slate-100";
+};
+
+const getSeverityStyle = (severity) => {
+  const map = {
+    Critical: "badge-high",
+    High: "badge-high",
+    Medium: "badge-medium",
+    Low: "badge-low"
+  };
+  return map[severity] || "badge-low";
 };
 
 /* ────────────────────────────────────────────────────────────────
@@ -142,6 +169,78 @@ const createPdfExport = (testCases, filePrefix, title) => {
   doc.save(getExportFileName(testCases, "pdf", filePrefix));
 };
 
+const getBugExportRows = (bugReports) =>
+  bugReports.map((bug) => ({
+    "Project Name": bug.projectName,
+    "Module Name": bug.moduleName,
+    "Bug ID": bug.bugId,
+    "Bug Title": bug.bugTitle,
+    "Steps to Reproduce": (bug.stepsToReproduce || []).map((s, i) => `${i + 1}. ${s}`).join("\n"),
+    "Expected Result": bug.expectedResult,
+    "Actual Result": bug.actualResult,
+    Severity: bug.severity,
+    Priority: bug.priority,
+    Environment: bug.environment,
+    Status: bug.status
+  }));
+
+const createBugExcelExport = (bugReports) => {
+  const ws = XLSX.utils.json_to_sheet(getBugExportRows(bugReports), { header: bugExportColumns });
+  ws["!cols"] = [{ wch: 22 }, { wch: 18 }, { wch: 14 }, { wch: 36 }, { wch: 48 }, { wch: 42 }, { wch: 42 }, { wch: 12 }, { wch: 12 }, { wch: 24 }, { wch: 14 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Bug Reports");
+  XLSX.writeFile(wb, "bug-reports.xlsx");
+};
+
+const createBugPdfExport = (bugReports) => {
+  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  const rows = getBugExportRows(bugReports);
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const margin = 10;
+  const lineHeight = 4.3;
+  const columns = [
+    { label: "Project Name", width: 25 }, { label: "Module Name", width: 24 }, { label: "Bug ID", width: 18 },
+    { label: "Bug Title", width: 38 }, { label: "Steps to Reproduce", width: 45 }, { label: "Expected Result", width: 42 },
+    { label: "Actual Result", width: 42 }, { label: "Severity", width: 18 }, { label: "Priority", width: 18 },
+    { label: "Environment", width: 28 }, { label: "Status", width: 18 }
+  ];
+  let y = 28;
+
+  const drawHeader = () => {
+    doc.setFont("helvetica", "bold"); doc.setFontSize(15); doc.setTextColor(15, 23, 42);
+    doc.text("Bug Reports", margin, 12);
+    doc.setFontSize(8); doc.text(`Total Records: ${bugReports.length}`, pageWidth - margin, 12, { align: "right" });
+    let x = margin;
+    doc.setFontSize(7.5); doc.setDrawColor(203, 213, 225);
+    columns.forEach((col) => {
+      doc.setFillColor(241, 245, 249);
+      doc.rect(x, 18, col.width, 8, "FD");
+      doc.text(col.label, x + 1.5, 23);
+      x += col.width;
+    });
+    doc.setFont("helvetica", "normal"); doc.setFontSize(7.3); doc.setTextColor(30, 41, 59);
+  };
+
+  drawHeader();
+  rows.forEach((row) => {
+    const wrapped = columns.map((col) => doc.splitTextToSize(String(row[col.label] || ""), col.width - 3));
+    const rowHeight = Math.max(...wrapped.map((cell) => cell.length)) * lineHeight + 3;
+    if (y + rowHeight > 195) {
+      doc.addPage();
+      y = 28;
+      drawHeader();
+    }
+    let x = margin;
+    wrapped.forEach((cell, i) => {
+      doc.rect(x, y, columns[i].width, rowHeight);
+      doc.text(cell, x + 1.5, y + 4);
+      x += columns[i].width;
+    });
+    y += rowHeight;
+  });
+  doc.save("bug-reports.pdf");
+};
+
 /* ────────────────────────────────────────────────────────────────
    SVG Icons
 ──────────────────────────────────────────────────────────────── */
@@ -170,6 +269,12 @@ const IconProjects = () => (
   <svg width="18" height="18" fill="none" viewBox="0 0 24 24">
     <path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
     <path d="M8 13h8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+  </svg>
+);
+const IconBug = () => (
+  <svg width="18" height="18" fill="none" viewBox="0 0 24 24">
+    <path d="M8 8h8v8a4 4 0 0 1-8 0V8z" stroke="currentColor" strokeWidth="1.8"/>
+    <path d="M9 8V6a3 3 0 0 1 6 0v2M4 13h4M16 13h4M5 20l3-3M19 20l-3-3M5 6l3 3M19 6l-3 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
   </svg>
 );
 const IconLogout = () => (
@@ -422,6 +527,91 @@ const TestCasesTable = ({
   );
 };
 
+const BugReportsTable = ({
+  bugReports,
+  editingBug,
+  editingBugId,
+  loading = {},
+  onCancelEdit,
+  onDelete,
+  onEdit,
+  onUpdate,
+  onUpdateEditingBug,
+  projects
+}) => (
+  <div className="overflow-x-auto">
+    <table className="min-w-[1500px] table-fixed border-collapse text-left text-sm table-dark w-full">
+      <thead>
+        <tr>
+          <th className="w-36 px-5 py-4">Project</th>
+          <th className="w-32 px-5 py-4">Module</th>
+          <th className="w-28 px-5 py-4">Bug ID</th>
+          <th className="w-56 px-5 py-4">Title</th>
+          <th className="w-72 px-5 py-4">Steps</th>
+          <th className="w-60 px-5 py-4">Expected</th>
+          <th className="w-60 px-5 py-4">Actual</th>
+          <th className="w-28 px-5 py-4">Severity</th>
+          <th className="w-28 px-5 py-4">Priority</th>
+          <th className="w-44 px-5 py-4">Environment</th>
+          <th className="w-28 px-5 py-4">Status</th>
+          <th className="w-48 px-5 py-4">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {bugReports.map((bug) => {
+          const isEditing = editingBugId === bug.id;
+          const isUpdating = isEditing && loading.updatingBug;
+          const isDeleting = loading.deletingBugId === bug.id;
+
+          return (
+            <tr key={bug.id} className="align-top transition-colors duration-150">
+              <td className="px-5 py-4">
+                {isEditing ? (
+                  <select className="input-dark text-xs" name="projectId" onChange={onUpdateEditingBug} value={editingBug.projectId || ""}>
+                    <option value="">No project</option>
+                    {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+                  </select>
+                ) : <span className="text-slate-300">{bug.projectName || "No project"}</span>}
+              </td>
+              <td className="px-5 py-4">{isEditing ? <input className="input-dark text-xs" name="moduleName" onChange={onUpdateEditingBug} value={editingBug.moduleName} /> : <span className="text-slate-300">{bug.moduleName}</span>}</td>
+              <td className="px-5 py-4"><span className="font-mono text-xs font-semibold text-green-400">{bug.bugId}</span></td>
+              <td className="px-5 py-4">{isEditing ? <textarea className="input-dark text-xs min-h-20" name="bugTitle" onChange={onUpdateEditingBug} value={editingBug.bugTitle} /> : <span className="text-slate-300 text-xs leading-relaxed">{bug.bugTitle}</span>}</td>
+              <td className="px-5 py-4">{isEditing ? <textarea className="input-dark text-xs min-h-28" name="stepsToReproduce" onChange={onUpdateEditingBug} value={editingBug.stepsToReproduce} /> : <ol className="list-decimal pl-4 space-y-1 text-xs text-slate-400">{(bug.stepsToReproduce || []).map((step, i) => <li key={i}>{step}</li>)}</ol>}</td>
+              <td className="px-5 py-4">{isEditing ? <textarea className="input-dark text-xs min-h-20" name="expectedResult" onChange={onUpdateEditingBug} value={editingBug.expectedResult} /> : <span className="text-slate-300 text-xs leading-relaxed">{bug.expectedResult}</span>}</td>
+              <td className="px-5 py-4">{isEditing ? <textarea className="input-dark text-xs min-h-20" name="actualResult" onChange={onUpdateEditingBug} value={editingBug.actualResult} /> : <span className="text-slate-300 text-xs leading-relaxed">{bug.actualResult}</span>}</td>
+              <td className="px-5 py-4">{isEditing ? <select className="input-dark text-xs" name="severity" onChange={onUpdateEditingBug} value={editingBug.severity}>{severities.map((severity) => <option key={severity}>{severity}</option>)}</select> : <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${getSeverityStyle(bug.severity)}`}>{bug.severity}</span>}</td>
+              <td className="px-5 py-4">{isEditing ? <select className="input-dark text-xs" name="priority" onChange={onUpdateEditingBug} value={editingBug.priority}>{priorities.map((priority) => <option key={priority}>{priority}</option>)}</select> : <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${getPriorityStyle(bug.priority)}`}>{bug.priority}</span>}</td>
+              <td className="px-5 py-4">{isEditing ? <input className="input-dark text-xs" name="environment" onChange={onUpdateEditingBug} value={editingBug.environment} /> : <span className="text-slate-300 text-xs">{bug.environment || "Not specified"}</span>}</td>
+              <td className="px-5 py-4">{isEditing ? <select className="input-dark text-xs" name="status" onChange={onUpdateEditingBug} value={editingBug.status}>{bugStatuses.map((status) => <option key={status}>{status}</option>)}</select> : <span className="text-xs font-semibold text-green-400">{bug.status}</span>}</td>
+              <td className="px-5 py-4">
+                {isEditing ? (
+                  <div className="flex gap-2 flex-wrap">
+                    <button className="inline-flex items-center gap-1.5 btn-primary px-3 py-1.5 text-xs" disabled={isUpdating} onClick={onUpdate} type="button">
+                      {isUpdating ? <><span className="spinner" /> Saving...</> : <><IconCheck /> Save</>}
+                    </button>
+                    <button className="inline-flex items-center gap-1.5 btn-ghost px-3 py-1.5 text-xs" disabled={isUpdating} onClick={onCancelEdit} type="button">
+                      <IconX /> Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2 flex-wrap">
+                    <button className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium transition-all duration-200" style={{ background: "rgba(148,163,184,0.08)", color: "#94a3b8", border: "1px solid rgba(148,163,184,0.15)" }} onClick={() => onEdit(bug)} type="button">
+                      <IconEdit /> Edit
+                    </button>
+                    <button className="btn-danger inline-flex items-center gap-1.5" disabled={isDeleting} onClick={() => onDelete(bug)} type="button">
+                      {isDeleting ? <><span className="spinner" /> Deleting...</> : <><IconTrash /> Delete</>}
+                    </button>
+                  </div>
+                )}
+              </td>
+            </tr>
+          );
+        })}
+      </tbody>
+    </table>
+  </div>
+);
+
 /* ────────────────────────────────────────────────────────────────
    Stat Card
 ──────────────────────────────────────────────────────────────── */
@@ -528,6 +718,12 @@ const Dashboard = ({ user, onLogout }) => {
   const [editingProjectForm, setEditingProjectForm] = useState(initialProjectForm);
   const [generatedTestCases, setGeneratedTestCases] = useState([]);
   const [savedTestCases, setSavedTestCases] = useState([]);
+  const [bugForm, setBugForm] = useState(initialBugForm);
+  const [generatedBugReport, setGeneratedBugReport] = useState(null);
+  const [savedBugReports, setSavedBugReports] = useState([]);
+  const [bugFilters, setBugFilters] = useState(initialBugFilters);
+  const [editingBugId, setEditingBugId] = useState("");
+  const [editingBug, setEditingBug] = useState(null);
   const [selectedSavedIds, setSelectedSavedIds] = useState([]);
   const [filters, setFilters] = useState(initialFilters);
   const [editingId, setEditingId] = useState("");
@@ -540,6 +736,11 @@ const Dashboard = ({ user, onLogout }) => {
     savingId: "",
     updatingCase: false,
     deletingId: "",
+    bulkDeleting: false,
+    generatingBug: false,
+    savingBug: false,
+    updatingBug: false,
+    deletingBugId: "",
     exporting: ""
   });
   const [message, setMessage] = useState("");
@@ -559,11 +760,24 @@ const Dashboard = ({ user, onLogout }) => {
     return data.projects;
   };
 
+  const loadSavedTestCases = async () => {
+    const { data } = await api.get("/tests");
+    setSavedTestCases(data.tests);
+    return data.tests;
+  };
+
+  const loadBugReports = async () => {
+    const { data } = await api.get("/bugs");
+    setSavedBugReports(data.bugReports);
+    return data.bugReports;
+  };
+
   useEffect(() => {
-    Promise.all([api.get("/tests"), api.get("/projects")])
-      .then(([testsResponse, projectsResponse]) => {
+    Promise.all([api.get("/tests"), api.get("/projects"), api.get("/bugs")])
+      .then(([testsResponse, projectsResponse, bugsResponse]) => {
         setSavedTestCases(testsResponse.data.tests);
         setProjects(projectsResponse.data.projects);
+        setSavedBugReports(bugsResponse.data.bugReports);
       })
       .catch((e) => {
         const errorMessage = getErrorMessage(e, "Could not load dashboard data");
@@ -580,6 +794,12 @@ const Dashboard = ({ user, onLogout }) => {
     Medium: savedTestCases.filter((tc) => tc.priority === "Medium").length,
     Low:    savedTestCases.filter((tc) => tc.priority === "Low").length
   }), [projects.length, savedTestCases]);
+
+  const bugSummary = useMemo(() => ({
+    total: savedBugReports.length,
+    open: savedBugReports.filter((bug) => bug.status === "Open").length,
+    severe: savedBugReports.filter((bug) => ["Critical", "High"].includes(bug.severity)).length
+  }), [savedBugReports]);
 
   const priorityChartData = useMemo(() => ([
     { name: "High", value: savedSummary.High, fill: "#ef4444" },
@@ -628,6 +848,15 @@ const Dashboard = ({ user, onLogout }) => {
     [savedTestCases, selectedSavedIds]
   );
 
+  const filteredBugReports = useMemo(() => {
+    const q = bugFilters.search.trim().toLowerCase();
+    return savedBugReports.filter((bug) =>
+      (!q || [bug.bugTitle, bug.moduleName, bug.projectName, bug.severity, bug.status].some((value) => (value || "").toLowerCase().includes(q))) &&
+      (!bugFilters.severity || bug.severity === bugFilters.severity) &&
+      (!bugFilters.status || bug.status === bugFilters.status)
+    );
+  }, [bugFilters, savedBugReports]);
+
   const updateForm = (e) => {
     const { name, value } = e.target;
     setForm((f) => {
@@ -638,6 +867,16 @@ const Dashboard = ({ user, onLogout }) => {
 
       return { ...f, [name]: value };
     });
+  };
+
+  const updateBugForm = (e) => {
+    const { name, value } = e.target;
+    setBugForm((f) => ({ ...f, [name]: value }));
+  };
+
+  const updateBugFilters = (e) => {
+    const { name, value } = e.target;
+    setBugFilters((f) => ({ ...f, [name]: value }));
   };
 
   const updateProjectForm = (e) => {
@@ -875,6 +1114,163 @@ const Dashboard = ({ user, onLogout }) => {
     }
   };
 
+  const handleDeleteSelected = async () => {
+    if (!selectedSavedIds.length) {
+      return;
+    }
+
+    const confirmed = window.confirm("Are you sure you want to delete selected test cases?");
+
+    if (!confirmed) {
+      return;
+    }
+
+    setError(""); setMessage("");
+    setLoadingFlag("bulkDeleting", true);
+
+    try {
+      await api.delete("/tests", { data: { ids: selectedSavedIds } });
+      const refreshedTests = await loadSavedTestCases();
+      const deletedIds = new Set(selectedSavedIds);
+
+      setGeneratedTestCases((cur) => cur.filter((testCase) => !deletedIds.has(testCase.id)));
+      setSelectedSavedIds([]);
+      setMessage("Selected test cases deleted successfully");
+      toast.success("Selected test cases deleted successfully");
+
+      return refreshedTests;
+    } catch (err) {
+      const errorMessage = getErrorMessage(err, "Failed to delete selected test cases");
+      setError(errorMessage);
+      toast.error("Failed to delete selected test cases");
+    } finally {
+      setLoadingFlag("bulkDeleting", false);
+    }
+  };
+
+  const handleGenerateBugReport = async (e) => {
+    e.preventDefault();
+    setError(""); setMessage("");
+    setLoadingFlag("generatingBug", true);
+    try {
+      const { data } = await api.post("/bugs/generate", bugForm);
+      setGeneratedBugReport(data.bugReport);
+      toast.success("Bug report generated successfully");
+    } catch (err) {
+      const errorMessage = getErrorMessage(err, "Failed to generate bug report");
+      setError(errorMessage);
+      toast.error("Failed to generate bug report");
+    } finally {
+      setLoadingFlag("generatingBug", false);
+    }
+  };
+
+  const handleSaveBugReport = async () => {
+    if (!generatedBugReport) return;
+    setError(""); setMessage("");
+    setLoadingFlag("savingBug", true);
+    try {
+      const { data } = await api.post("/bugs", { bugReport: generatedBugReport });
+      setSavedBugReports((cur) => [data.bugReport, ...cur]);
+      setGeneratedBugReport(null);
+      toast.success("Bug report saved successfully");
+    } catch (err) {
+      const errorMessage = getErrorMessage(err, "Failed to save bug report");
+      setError(errorMessage);
+      toast.error("Failed to save bug report");
+    } finally {
+      setLoadingFlag("savingBug", false);
+    }
+  };
+
+  const startEditingBug = (bug) => {
+    setEditingBugId(bug.id);
+    setEditingBug({ ...bug, stepsToReproduce: (bug.stepsToReproduce || []).join("\n") });
+    setError(""); setMessage("");
+  };
+
+  const updateEditingBug = (e) => {
+    const { name, value } = e.target;
+    setEditingBug((cur) => {
+      if (name === "projectId") {
+        const project = projects.find((item) => item.id === value);
+        return { ...cur, projectId: value, projectName: project?.name || "" };
+      }
+      return { ...cur, [name]: value };
+    });
+  };
+
+  const cancelEditingBug = () => {
+    setEditingBugId("");
+    setEditingBug(null);
+  };
+
+  const handleUpdateBugReport = async () => {
+    setError(""); setMessage("");
+    setLoadingFlag("updatingBug", true);
+    try {
+      const payload = {
+        ...editingBug,
+        stepsToReproduce: editingBug.stepsToReproduce.split("\n").map((s) => s.trim()).filter(Boolean)
+      };
+      const { data } = await api.put(`/bugs/${editingBug.id}`, payload);
+      setSavedBugReports((cur) => cur.map((bug) => bug.id === data.bugReport.id ? data.bugReport : bug));
+      cancelEditingBug();
+      toast.success("Bug report updated successfully");
+    } catch (err) {
+      const errorMessage = getErrorMessage(err, "Failed to update bug report");
+      setError(errorMessage);
+      toast.error("Failed to update bug report");
+    } finally {
+      setLoadingFlag("updatingBug", false);
+    }
+  };
+
+  const handleDeleteBugReport = async (bug) => {
+    if (!window.confirm(`Delete bug report "${bug.bugId}"?`)) return;
+    setError(""); setMessage("");
+    setLoadingFlag("deletingBugId", bug.id);
+    try {
+      await api.delete(`/bugs/${bug.id}`);
+      setSavedBugReports((cur) => cur.filter((item) => item.id !== bug.id));
+      toast.success("Bug report deleted successfully");
+    } catch (err) {
+      const errorMessage = getErrorMessage(err, "Failed to delete bug report");
+      setError(errorMessage);
+      toast.error("Failed to delete bug report");
+    } finally {
+      setLoadingFlag("deletingBugId", "");
+    }
+  };
+
+  const exportBugExcel = async () => {
+    if (!filteredBugReports.length) { toast.error("Export failed: No bug reports to export"); return; }
+    setLoadingFlag("exporting", "excel:bugs");
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      createBugExcelExport(filteredBugReports);
+      toast.success("Excel export completed");
+    } catch {
+      toast.error("Export failed: Could not export bug reports");
+    } finally {
+      setLoadingFlag("exporting", "");
+    }
+  };
+
+  const exportBugPdf = async () => {
+    if (!filteredBugReports.length) { toast.error("Export failed: No bug reports to export"); return; }
+    setLoadingFlag("exporting", "pdf:bugs");
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      createBugPdfExport(filteredBugReports);
+      toast.success("PDF export completed");
+    } catch {
+      toast.error("Export failed: Could not export bug reports");
+    } finally {
+      setLoadingFlag("exporting", "");
+    }
+  };
+
   const exportExcel = async (cases, prefix, emptyMsg) => {
     if (!cases.length) { setError(emptyMsg); setMessage(""); toast.error(`Export failed: ${emptyMsg}`); return; }
     setLoadingFlag("exporting", `excel:${prefix}`);
@@ -920,16 +1316,36 @@ const Dashboard = ({ user, onLogout }) => {
   };
 
   /* ── Nav items ── */
-  const navItems = [
-    { id: "generate",  label: "Generate",     icon: <IconGenerate /> },
-    { id: "projects",  label: "Projects",     icon: <IconProjects /> },
-    { id: "saved",     label: "Saved Cases",  icon: <IconSaved /> },
-    { id: "dashboard", label: "Dashboard",    icon: <IconDashboard /> }
+  const navSections = [
+    {
+      label: "MAIN",
+      items: [{ id: "dashboard", label: "Dashboard", icon: <IconDashboard /> }]
+    },
+    {
+      label: "TEST CASES",
+      items: [
+        { id: "generate", label: "Generate Test Cases", icon: <IconGenerate /> },
+        { id: "saved", label: "Saved Test Cases", icon: <IconSaved /> }
+      ]
+    },
+    {
+      label: "BUG REPORTS",
+      items: [
+        { id: "generateBug", label: "Generate Bug Report", icon: <IconBug /> },
+        { id: "savedBugs", label: "Saved Bug Reports", icon: <IconSaved /> }
+      ]
+    },
+    {
+      label: "MANAGEMENT",
+      items: [{ id: "projects", label: "Projects", icon: <IconProjects /> }]
+    }
   ];
 
   const pageMeta = {
     generate:  { title: "Generate Test Cases",  sub: "Describe a feature and create structured QA test cases instantly with AI." },
     projects:  { title: "Projects",             sub: "Create and manage project workspaces for your QA test cases." },
+    generateBug: { title: "Generate Bug Report", sub: "Turn bug details into a structured professional QA bug report." },
+    savedBugs: { title: "Saved Bug Reports", sub: "Search, filter, edit and export your saved QA bug reports." },
     saved:     { title: "Saved Test Cases",     sub: "Search, filter, edit and export your saved QA library." },
     dashboard: { title: "Analytics Dashboard",  sub: "Review your test case totals and priority distribution at a glance." }
   };
@@ -969,25 +1385,40 @@ const Dashboard = ({ user, onLogout }) => {
         </div>
 
         {/* Navigation */}
-        <nav className="flex flex-col gap-1 flex-1">
-          {navItems.map((item) => (
-            <button
-              key={item.id}
-              className={`nav-item ${activeView === item.id ? "active" : ""}`}
-              onClick={() => setActiveView(item.id)}
-              type="button"
-            >
-              {item.icon}
-              {item.label}
-              {item.id === "saved" && savedTestCases.length > 0 && (
-                <span
-                  className="ml-auto text-xs font-bold px-2 py-0.5 rounded-full"
-                  style={{ background: "rgba(34,197,94,0.15)", color: "#4ade80" }}
+        <nav className="flex flex-col gap-5 flex-1 overflow-y-auto pr-1">
+          {navSections.map((section) => (
+            <div key={section.label} className="space-y-1">
+              <p className="px-2 pb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-600">
+                {section.label}
+              </p>
+              {section.items.map((item) => (
+                <button
+                  key={item.id}
+                  className={`nav-item ${activeView === item.id ? "active" : ""}`}
+                  onClick={() => setActiveView(item.id)}
+                  type="button"
                 >
-                  {savedTestCases.length}
-                </span>
-              )}
-            </button>
+                  {item.icon}
+                  <span className="truncate">{item.label}</span>
+                  {item.id === "saved" && savedTestCases.length > 0 && (
+                    <span
+                      className="ml-auto text-xs font-bold px-2 py-0.5 rounded-full"
+                      style={{ background: "rgba(34,197,94,0.15)", color: "#4ade80" }}
+                    >
+                      {savedTestCases.length}
+                    </span>
+                  )}
+                  {item.id === "savedBugs" && savedBugReports.length > 0 && (
+                    <span
+                      className="ml-auto text-xs font-bold px-2 py-0.5 rounded-full"
+                      style={{ background: "rgba(34,197,94,0.15)", color: "#4ade80" }}
+                    >
+                      {savedBugReports.length}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
           ))}
         </nav>
 
@@ -1275,6 +1706,133 @@ const Dashboard = ({ user, onLogout }) => {
             </div>
           )}
 
+          {activeView === "generateBug" && (
+            <div className="space-y-6 animate-fade-in">
+              <form className="rounded-2xl p-6" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }} onSubmit={handleGenerateBugReport}>
+                <h3 className="text-base font-semibold text-slate-200 mb-5">Bug Report Details</h3>
+                <div className="grid gap-5 md:grid-cols-2">
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium text-slate-400">Project</span>
+                    <select className="input-dark" name="projectId" onChange={updateBugForm} value={bugForm.projectId}>
+                      <option value="">No project</option>
+                      {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+                    </select>
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium text-slate-400">Module Name</span>
+                    <input className="input-dark" name="moduleName" onChange={updateBugForm} placeholder="e.g. Authentication" required value={bugForm.moduleName} />
+                  </label>
+                  <label className="space-y-2 md:col-span-2">
+                    <span className="text-sm font-medium text-slate-400">Bug Summary</span>
+                    <input className="input-dark" name="bugSummary" onChange={updateBugForm} placeholder="e.g. Login fails with valid credentials" required value={bugForm.bugSummary} />
+                  </label>
+                  <label className="space-y-2 md:col-span-2">
+                    <span className="text-sm font-medium text-slate-400">Steps or Notes</span>
+                    <textarea className="input-dark min-h-28 resize-y" name="stepsOrNotes" onChange={updateBugForm} placeholder="Enter each step on a new line" required value={bugForm.stepsOrNotes} />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium text-slate-400">Expected Result</span>
+                    <textarea className="input-dark min-h-24 resize-y" name="expectedResult" onChange={updateBugForm} required value={bugForm.expectedResult} />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium text-slate-400">Actual Result</span>
+                    <textarea className="input-dark min-h-24 resize-y" name="actualResult" onChange={updateBugForm} required value={bugForm.actualResult} />
+                  </label>
+                  <label className="space-y-2 md:col-span-2">
+                    <span className="text-sm font-medium text-slate-400">Environment</span>
+                    <input className="input-dark" name="environment" onChange={updateBugForm} placeholder="e.g. Chrome 125, Windows 11, QA build" value={bugForm.environment} />
+                  </label>
+                  <div className="md:col-span-2">
+                    <button className="btn-primary inline-flex items-center gap-2" disabled={loading.generatingBug} type="submit">
+                      {loading.generatingBug ? <><span className="spinner" /> Generating...</> : <><IconBug /> Generate Bug Report</>}
+                    </button>
+                  </div>
+                </div>
+              </form>
+
+              {generatedBugReport && (
+                <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-6 py-5" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                    <div>
+                      <h3 className="text-base font-semibold text-slate-200">Generated Bug Report</h3>
+                      <p className="text-sm text-slate-500">{generatedBugReport.bugId} - {generatedBugReport.severity} severity</p>
+                    </div>
+                    <button className="btn-primary inline-flex items-center gap-2" disabled={loading.savingBug} onClick={handleSaveBugReport} type="button">
+                      {loading.savingBug ? <><span className="spinner" /> Saving...</> : <><IconSave /> Save Bug Report</>}
+                    </button>
+                  </div>
+                  <div className="p-6 grid gap-4 md:grid-cols-2">
+                    {[
+                      ["Bug Title", generatedBugReport.bugTitle],
+                      ["Expected Result", generatedBugReport.expectedResult],
+                      ["Actual Result", generatedBugReport.actualResult],
+                      ["Environment", generatedBugReport.environment || "Not specified"],
+                      ["Severity", generatedBugReport.severity],
+                      ["Priority", generatedBugReport.priority],
+                      ["Status", generatedBugReport.status]
+                    ].map(([label, value]) => (
+                      <div key={label}>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-slate-600">{label}</p>
+                        <p className="mt-1 text-sm text-slate-300">{value}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+            </div>
+          )}
+
+          {activeView === "savedBugs" && (
+            <div className="space-y-6 animate-fade-in">
+              <div className="rounded-2xl p-6" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between mb-5">
+                  <div>
+                    <h3 className="text-base font-semibold text-slate-200">Saved Bug Reports</h3>
+                    <p className="text-sm text-slate-500 mt-0.5">{filteredBugReports.length} shown</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <ExportBtn icon={<IconExcel />} label="Export Excel" accent="green" disabled={!filteredBugReports.length} loading={loading.exporting === "excel:bugs"} onClick={exportBugExcel} />
+                    <ExportBtn icon={<IconPdf />} label="Export PDF" accent="sky" disabled={!filteredBugReports.length} loading={loading.exporting === "pdf:bugs"} onClick={exportBugPdf} />
+                  </div>
+                </div>
+                <div className="grid gap-3 lg:grid-cols-[1.5fr_1fr_1fr_auto] mb-5">
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"><IconSearch /></span>
+                    <input className="input-dark pl-10" name="search" onChange={updateBugFilters} placeholder="Search title, module, project, severity or status..." type="search" value={bugFilters.search} />
+                  </div>
+                  <select className="input-dark" name="severity" onChange={updateBugFilters} value={bugFilters.severity}>
+                    <option value="">All severities</option>
+                    {severities.map((severity) => <option key={severity} value={severity}>{severity}</option>)}
+                  </select>
+                  <select className="input-dark" name="status" onChange={updateBugFilters} value={bugFilters.status}>
+                    <option value="">All statuses</option>
+                    {bugStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
+                  </select>
+                  <button className="btn-ghost whitespace-nowrap" onClick={() => setBugFilters(initialBugFilters)} type="button">Clear</button>
+                </div>
+                {savedBugReports.length === 0 ? (
+                  <EmptyState title="No bug reports yet" description="Generate and save a bug report to build your QA issue library." icon={<IconBug />} />
+                ) : filteredBugReports.length === 0 ? (
+                  <EmptyState title="No matching bug reports" description="Try adjusting search or filters." icon={<IconSearch />} />
+                ) : (
+                  <BugReportsTable
+                    bugReports={filteredBugReports}
+                    editingBug={editingBug}
+                    editingBugId={editingBugId}
+                    loading={loading}
+                    onCancelEdit={cancelEditingBug}
+                    onDelete={handleDeleteBugReport}
+                    onEdit={startEditingBug}
+                    onUpdate={handleUpdateBugReport}
+                    onUpdateEditingBug={updateEditingBug}
+                    projects={projects}
+                  />
+                )}
+              </div>
+            </div>
+          )}
+
           {activeView === "saved" && (
             <div className="space-y-6 animate-fade-in">
               {/* Filters */}
@@ -1285,6 +1843,18 @@ const Dashboard = ({ user, onLogout }) => {
                     <p className="text-sm text-slate-500 mt-0.5">Filter saved cases, select rows, then export.</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
+                    <button
+                      className="btn-danger inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold"
+                      disabled={!selectedSavedIds.length || loading.bulkDeleting}
+                      onClick={handleDeleteSelected}
+                      style={{
+                        cursor: !selectedSavedIds.length || loading.bulkDeleting ? "not-allowed" : "pointer",
+                        opacity: !selectedSavedIds.length || loading.bulkDeleting ? 0.5 : 1
+                      }}
+                      type="button"
+                    >
+                      {loading.bulkDeleting ? <><span className="spinner" /> Deleting...</> : <><IconTrash /> Delete Selected</>}
+                    </button>
                     <ExportBtn icon={<IconExcel />} label="Export Selected (Excel)" accent="green"
                       disabled={!selectedSavedTestCases.length}
                       loading={loading.exporting === "excel:saved-test-cases"}
@@ -1379,6 +1949,24 @@ const Dashboard = ({ user, onLogout }) => {
                   description="Unique modules represented in saved test cases."
                   glowColor="#38bdf8"
                   icon={<svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16" stroke="#38bdf8" strokeWidth="1.8" strokeLinecap="round"/><path d="M8 3v4M16 10v4M12 17v4" stroke="#38bdf8" strokeWidth="1.8" strokeLinecap="round"/></svg>}
+                />
+                <StatCard
+                  label="Total Bug Reports" value={bugSummary.total}
+                  description="Saved professional QA bug reports."
+                  glowColor="#a855f7"
+                  icon={<IconBug />}
+                />
+                <StatCard
+                  label="Open Bugs" value={bugSummary.open}
+                  description="Bug reports currently marked as open."
+                  glowColor="#f97316"
+                  icon={<svg width="20" height="20" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="#fb923c" strokeWidth="1.8"/><path d="M12 7v6l4 2" stroke="#fb923c" strokeWidth="1.8" strokeLinecap="round"/></svg>}
+                />
+                <StatCard
+                  label="Critical/High Severity Bugs" value={bugSummary.severe}
+                  description="Severe bugs that need fast QA attention."
+                  glowColor="#ef4444"
+                  icon={<svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke="#f87171" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                 />
                 <StatCard
                   label="High Priority Test Cases" value={savedSummary.High}
