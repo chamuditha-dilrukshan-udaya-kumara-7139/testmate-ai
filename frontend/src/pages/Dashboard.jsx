@@ -1,6 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { jsPDF } from "jspdf";
 import * as XLSX from "xlsx";
+import { toast } from "react-toastify";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis
+} from "recharts";
 import api from "../api/client.js";
 import testmateLogo from "../assets/testmate-logo.png";
 
@@ -244,6 +255,7 @@ const TestCasesTable = ({
   testCases, editingCase, editingId,
   onCancelEdit, onDelete, onEdit, onSave, onUpdateEdit, onUpdateEditingCase, onUpdateEditingProject,
   projects = [],
+  loading = {},
   selectable = false, selectedIds = [], onToggleSelected, onToggleAll,
   showSave = false
 }) => {
@@ -278,6 +290,9 @@ const TestCasesTable = ({
         <tbody>
           {testCases.map((tc) => {
             const isEditing = editingId === tc.id;
+            const isSaving = loading.savingId === tc.id;
+            const isDeleting = loading.deletingId === tc.id;
+            const isUpdating = isEditing && loading.updatingCase;
             return (
               <tr key={tc.id} className="align-top transition-colors duration-150">
                 {selectable && (
@@ -353,12 +368,14 @@ const TestCasesTable = ({
                     <div className="flex gap-2 flex-wrap">
                       <button
                         className="inline-flex items-center gap-1.5 btn-primary px-3 py-1.5 text-xs"
+                        disabled={isUpdating}
                         onClick={onUpdateEdit} type="button"
                       >
-                        <IconCheck /> Save
+                        {isUpdating ? <><span className="spinner" /> Saving...</> : <><IconCheck /> Save</>}
                       </button>
                       <button
                         className="inline-flex items-center gap-1.5 btn-ghost px-3 py-1.5 text-xs"
+                        disabled={isUpdating}
                         onClick={onCancelEdit} type="button"
                       >
                         <IconX /> Cancel
@@ -376,11 +393,11 @@ const TestCasesTable = ({
                             background: "rgba(34,197,94,0.12)", color: "#4ade80",
                             border: "1px solid rgba(34,197,94,0.2)"
                           }}
-                          disabled={tc.saved}
+                          disabled={tc.saved || isSaving}
                           onClick={() => onSave(tc)}
                           type="button"
                         >
-                          {tc.saved ? <><IconCheck /> Saved</> : <><IconSave /> Save</>}
+                          {isSaving ? <><span className="spinner" /> Saving...</> : tc.saved ? <><IconCheck /> Saved</> : <><IconSave /> Save</>}
                         </button>
                       )}
                       <button
@@ -390,8 +407,8 @@ const TestCasesTable = ({
                       >
                         <IconEdit /> Edit
                       </button>
-                      <button className="btn-danger inline-flex items-center gap-1.5" onClick={() => onDelete(tc)} type="button">
-                        <IconTrash /> Delete
+                      <button className="btn-danger inline-flex items-center gap-1.5" disabled={isDeleting} onClick={() => onDelete(tc)} type="button">
+                        {isDeleting ? <><span className="spinner" /> Deleting...</> : <><IconTrash /> Delete</>}
                       </button>
                     </div>
                   )}
@@ -432,7 +449,7 @@ const StatCard = ({ label, value, description, glowColor, icon }) => (
 /* ────────────────────────────────────────────────────────────────
    Export Button
 ──────────────────────────────────────────────────────────────── */
-const ExportBtn = ({ icon, label, onClick, disabled, accent = "slate" }) => {
+const ExportBtn = ({ icon, label, onClick, disabled, loading = false, accent = "slate" }) => {
   const accents = {
     green: { bg: "rgba(34,197,94,0.08)", color: "#4ade80", border: "rgba(34,197,94,0.2)", hoverBg: "rgba(34,197,94,0.15)" },
     sky:   { bg: "rgba(56,189,248,0.08)", color: "#38bdf8", border: "rgba(56,189,248,0.2)", hoverBg: "rgba(56,189,248,0.15)" },
@@ -443,20 +460,61 @@ const ExportBtn = ({ icon, label, onClick, disabled, accent = "slate" }) => {
     <button
       type="button"
       onClick={onClick}
-      disabled={disabled}
+      disabled={disabled || loading}
       className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200"
       style={{
-        background: a.bg, color: disabled ? "#475569" : a.color,
-        border: `1px solid ${disabled ? "rgba(71,85,105,0.2)" : a.border}`,
-        cursor: disabled ? "not-allowed" : "pointer",
-        opacity: disabled ? 0.5 : 1
+        background: a.bg, color: disabled || loading ? "#475569" : a.color,
+        border: `1px solid ${disabled || loading ? "rgba(71,85,105,0.2)" : a.border}`,
+        cursor: disabled || loading ? "not-allowed" : "pointer",
+        opacity: disabled || loading ? 0.5 : 1
       }}
     >
-      {icon}
-      {label}
+      {loading ? <span className="spinner" /> : icon}
+      {loading ? "Exporting..." : label}
     </button>
   );
 };
+
+const formatActivityDate = (value) => {
+  if (!value) {
+    return "No date";
+  }
+
+  return new Date(value).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric"
+  });
+};
+
+const ActivityPanel = ({ title, emptyText, items, renderItem }) => (
+  <div className="rounded-2xl p-5" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+    <h3 className="text-base font-semibold text-slate-200 mb-4">{title}</h3>
+    {items.length === 0 ? (
+      <p className="text-sm text-slate-500">{emptyText}</p>
+    ) : (
+      <div className="space-y-3">
+        {items.map(renderItem)}
+      </div>
+    )}
+  </div>
+);
+
+const ActivityItem = ({ title, meta, badge }) => (
+  <div className="rounded-xl p-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+    <div className="flex items-start justify-between gap-3">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-semibold text-slate-200">{title}</p>
+        <p className="mt-1 text-xs text-slate-500">{meta}</p>
+      </div>
+      {badge && (
+        <span className="shrink-0 rounded-full px-2 py-1 text-xs font-semibold text-green-400" style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.16)" }}>
+          {badge}
+        </span>
+      )}
+    </div>
+  </div>
+);
 
 /* ────────────────────────────────────────────────────────────────
    Main Dashboard
@@ -475,8 +533,31 @@ const Dashboard = ({ user, onLogout }) => {
   const [editingId, setEditingId] = useState("");
   const [editingCase, setEditingCase] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [loading, setLoading] = useState({
+    projectCreate: false,
+    projectUpdateId: "",
+    projectDeleteId: "",
+    savingId: "",
+    updatingCase: false,
+    deletingId: "",
+    exporting: ""
+  });
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+
+  const getErrorMessage = (err, fallback) => (
+    err.response?.data?.message || err.message || fallback
+  );
+
+  const setLoadingFlag = (key, value) => {
+    setLoading((cur) => ({ ...cur, [key]: value }));
+  };
+
+  const loadProjects = async () => {
+    const { data } = await api.get("/projects");
+    setProjects(data.projects);
+    return data.projects;
+  };
 
   useEffect(() => {
     Promise.all([api.get("/tests"), api.get("/projects")])
@@ -484,16 +565,49 @@ const Dashboard = ({ user, onLogout }) => {
         setSavedTestCases(testsResponse.data.tests);
         setProjects(projectsResponse.data.projects);
       })
-      .catch((e) => setError(e.response?.data?.message || "Could not load dashboard data"));
+      .catch((e) => {
+        const errorMessage = getErrorMessage(e, "Could not load dashboard data");
+        setError(errorMessage);
+        toast.error(errorMessage);
+      });
   }, []);
 
   const savedSummary = useMemo(() => ({
     projects: projects.length,
     total: savedTestCases.length,
+    modules: new Set(savedTestCases.map((tc) => tc.moduleName).filter(Boolean)).size,
     High:   savedTestCases.filter((tc) => tc.priority === "High").length,
     Medium: savedTestCases.filter((tc) => tc.priority === "Medium").length,
     Low:    savedTestCases.filter((tc) => tc.priority === "Low").length
   }), [projects.length, savedTestCases]);
+
+  const priorityChartData = useMemo(() => ([
+    { name: "High", value: savedSummary.High, fill: "#ef4444" },
+    { name: "Medium", value: savedSummary.Medium, fill: "#f59e0b" },
+    { name: "Low", value: savedSummary.Low, fill: "#22c55e" }
+  ]), [savedSummary.High, savedSummary.Low, savedSummary.Medium]);
+
+  const recentProjects = useMemo(
+    () => [...projects]
+      .sort((a, b) => new Date(b.createdAt || b.updatedAt || 0) - new Date(a.createdAt || a.updatedAt || 0))
+      .slice(0, 5),
+    [projects]
+  );
+
+  const recentlySavedTestCases = useMemo(
+    () => [...savedTestCases]
+      .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))
+      .slice(0, 5),
+    [savedTestCases]
+  );
+
+  const recentlyUpdatedTestCases = useMemo(
+    () => [...savedTestCases]
+      .filter((tc) => tc.updatedAt)
+      .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+      .slice(0, 5),
+    [savedTestCases]
+  );
 
   const moduleOptions = useMemo(
     () => [...new Set(savedTestCases.map((tc) => tc.moduleName).filter(Boolean))].sort(),
@@ -553,16 +667,34 @@ const Dashboard = ({ user, onLogout }) => {
     setForm((cur) => cur.projectId === project.id ? { ...cur, projectName: project.name } : cur);
   };
 
+  const detachDeletedProject = (project) => {
+    const projectName = `${project.name} (deleted)`;
+
+    setGeneratedTestCases((cur) => cur.map((tc) => (
+      tc.projectId === project.id ? { ...tc, projectId: "", projectName } : tc
+    )));
+    setSavedTestCases((cur) => cur.map((tc) => (
+      tc.projectId === project.id ? { ...tc, projectId: "", projectName } : tc
+    )));
+    setForm((cur) => cur.projectId === project.id ? { ...cur, projectId: "", projectName: "" } : cur);
+  };
+
   const handleCreateProject = async (e) => {
     e.preventDefault();
     setError(""); setMessage("");
+    setLoadingFlag("projectCreate", true);
     try {
       const { data } = await api.post("/projects", projectForm);
-      setProjects((cur) => [data.project, ...cur]);
+      await loadProjects();
       setProjectForm(initialProjectForm);
       setMessage(`${data.project.name} created.`);
+      toast.success("Project created successfully");
     } catch (err) {
-      setError(err.response?.data?.message || "Could not create project");
+      const errorMessage = getErrorMessage(err, "Could not create project");
+      setError(errorMessage);
+      toast.error(`Project create failed: ${errorMessage}`);
+    } finally {
+      setLoadingFlag("projectCreate", false);
     }
   };
 
@@ -579,26 +711,44 @@ const Dashboard = ({ user, onLogout }) => {
 
   const handleUpdateProject = async (projectId) => {
     setError(""); setMessage("");
+    setLoadingFlag("projectUpdateId", projectId);
     try {
       const { data } = await api.put(`/projects/${projectId}`, editingProjectForm);
-      setProjects((cur) => cur.map((project) => project.id === projectId ? data.project : project));
+      await loadProjects();
       syncProjectName(data.project);
       cancelEditingProject();
       setMessage(`${data.project.name} updated.`);
+      toast.success("Project updated successfully");
     } catch (err) {
-      setError(err.response?.data?.message || "Could not update project");
+      const errorMessage = getErrorMessage(err, "Could not update project");
+      setError(errorMessage);
+      toast.error(`Project update failed: ${errorMessage}`);
+    } finally {
+      setLoadingFlag("projectUpdateId", "");
     }
   };
 
   const handleDeleteProject = async (project) => {
     setError(""); setMessage("");
+    const confirmed = window.confirm(`Delete project "${project.name}"? Related saved test cases will be kept and marked as deleted project.`);
+
+    if (!confirmed) {
+      return;
+    }
+
     try {
+      setLoadingFlag("projectDeleteId", project.id);
       await api.delete(`/projects/${project.id}`);
-      setProjects((cur) => cur.filter((item) => item.id !== project.id));
-      setForm((cur) => cur.projectId === project.id ? { ...cur, projectId: "", projectName: "" } : cur);
+      await loadProjects();
+      detachDeletedProject(project);
       setMessage(`${project.name} deleted.`);
+      toast.success("Project deleted successfully");
     } catch (err) {
-      setError(err.response?.data?.message || "Could not delete project");
+      const errorMessage = getErrorMessage(err, "Could not delete project");
+      setError(errorMessage);
+      toast.error(`Project delete failed: ${errorMessage}`);
+    } finally {
+      setLoadingFlag("projectDeleteId", "");
     }
   };
 
@@ -607,6 +757,7 @@ const Dashboard = ({ user, onLogout }) => {
     setIsGenerating(true); setError(""); setMessage(""); setEditingId(""); setEditingCase(null);
     if (!form.projectId) {
       setError("Select a project before generating test cases");
+      toast.error("Test case generation failed: Select a project before generating test cases");
       setIsGenerating(false);
       return;
     }
@@ -615,8 +766,11 @@ const Dashboard = ({ user, onLogout }) => {
       setGeneratedTestCases(data.testCases);
       setActiveView("generate");
       setMessage(`✓ ${data.testCases.length} test cases generated.`);
+      toast.success("Test cases generated successfully");
     } catch (err) {
-      setError(err.response?.data?.message || "Could not generate test cases");
+      const errorMessage = getErrorMessage(err, "Could not generate test cases");
+      setError(errorMessage);
+      toast.error(`Test case generation failed: ${errorMessage}`);
     } finally {
       setIsGenerating(false);
     }
@@ -624,6 +778,7 @@ const Dashboard = ({ user, onLogout }) => {
 
   const handleSave = async (tc) => {
     setError(""); setMessage("");
+    setLoadingFlag("savingId", tc.id);
     try {
       const { data } = await api.post("/tests", { testCase: tc });
       setGeneratedTestCases((cur) => cur.map((item) => item.id === tc.id ? data.testCase : item));
@@ -632,8 +787,13 @@ const Dashboard = ({ user, onLogout }) => {
         return exists ? cur.map((item) => item.id === data.testCase.id ? data.testCase : item) : [...cur, data.testCase];
       });
       setMessage(`✓ ${data.testCase.testCaseId} saved.`);
+      toast.success("Test case saved successfully");
     } catch (err) {
-      setError(err.response?.data?.message || "Could not save test case");
+      const errorMessage = getErrorMessage(err, "Could not save test case");
+      setError(errorMessage);
+      toast.error(`Save failed: ${errorMessage}`);
+    } finally {
+      setLoadingFlag("savingId", "");
     }
   };
 
@@ -666,6 +826,7 @@ const Dashboard = ({ user, onLogout }) => {
 
   const handleUpdate = async () => {
     setError(""); setMessage("");
+    setLoadingFlag("updatingCase", true);
     const payload = { ...editingCase, testSteps: editingCase.testSteps.split("\n").map((s) => s.trim()).filter(Boolean) };
     try {
       const endpoint = editingCase.saved ? `/tests/${editingCase.id}` : "/tests";
@@ -678,9 +839,14 @@ const Dashboard = ({ user, onLogout }) => {
         setSavedTestCases((cur) => [...cur, data.testCase]);
       }
       setMessage(`✓ ${data.testCase.testCaseId} updated.`);
+      toast.success("Test case updated successfully");
       cancelEditing();
     } catch (err) {
-      setError(err.response?.data?.message || "Could not update test case");
+      const errorMessage = getErrorMessage(err, "Could not update test case");
+      setError(errorMessage);
+      toast.error(`Update failed: ${errorMessage}`);
+    } finally {
+      setLoadingFlag("updatingCase", false);
     }
   };
 
@@ -689,27 +855,58 @@ const Dashboard = ({ user, onLogout }) => {
     if (!tc.saved) {
       setGeneratedTestCases((cur) => cur.filter((item) => item.id !== tc.id));
       setMessage(`✓ ${tc.testCaseId} removed.`);
+      toast.success("Test case deleted successfully");
       return;
     }
     try {
+      setLoadingFlag("deletingId", tc.id);
       await api.delete(`/tests/${tc.id}`);
       setSavedTestCases((cur) => cur.filter((item) => item.id !== tc.id));
       setGeneratedTestCases((cur) => cur.filter((item) => item.id !== tc.id));
       setSelectedSavedIds((cur) => cur.filter((id) => id !== tc.id));
       setMessage(`✓ ${tc.testCaseId} deleted.`);
+      toast.success("Test case deleted successfully");
     } catch (err) {
-      setError(err.response?.data?.message || "Could not delete test case");
+      const errorMessage = getErrorMessage(err, "Could not delete test case");
+      setError(errorMessage);
+      toast.error(`Delete failed: ${errorMessage}`);
+    } finally {
+      setLoadingFlag("deletingId", "");
     }
   };
 
-  const exportExcel = (cases, prefix, emptyMsg) => {
-    if (!cases.length) { setError(emptyMsg); setMessage(""); return; }
-    createExcelExport(cases, prefix); setMessage("✓ Excel exported."); setError("");
+  const exportExcel = async (cases, prefix, emptyMsg) => {
+    if (!cases.length) { setError(emptyMsg); setMessage(""); toast.error(`Export failed: ${emptyMsg}`); return; }
+    setLoadingFlag("exporting", `excel:${prefix}`);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      createExcelExport(cases, prefix);
+      setMessage("✓ Excel exported."); setError("");
+      toast.success("Excel export completed");
+    } catch (err) {
+      const errorMessage = getErrorMessage(err, "Could not export Excel");
+      setError(errorMessage);
+      toast.error(`Export failed: ${errorMessage}`);
+    } finally {
+      setLoadingFlag("exporting", "");
+    }
   };
 
-  const exportPdf = (cases, prefix, title, emptyMsg) => {
-    if (!cases.length) { setError(emptyMsg); setMessage(""); return; }
-    createPdfExport(cases, prefix, title); setMessage("✓ PDF exported."); setError("");
+  const exportPdf = async (cases, prefix, title, emptyMsg) => {
+    if (!cases.length) { setError(emptyMsg); setMessage(""); toast.error(`Export failed: ${emptyMsg}`); return; }
+    setLoadingFlag("exporting", `pdf:${prefix}`);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      createPdfExport(cases, prefix, title);
+      setMessage("✓ PDF exported."); setError("");
+      toast.success("PDF export completed");
+    } catch (err) {
+      const errorMessage = getErrorMessage(err, "Could not export PDF");
+      setError(errorMessage);
+      toast.error(`Export failed: ${errorMessage}`);
+    } finally {
+      setLoadingFlag("exporting", "");
+    }
   };
 
   const toggleSavedSelection = (id) => {
@@ -841,14 +1038,6 @@ const Dashboard = ({ user, onLogout }) => {
             </div>
           </header>
 
-          {/* Toast notifications */}
-          {(error || message) && (
-            <div className="mb-6 animate-slide-up">
-              {error   && <div className="toast-error mb-2">{error}</div>}
-              {message && <div className="toast-success">{message}</div>}
-            </div>
-          )}
-
           {/* ══════════ GENERATE VIEW ══════════ */}
           {activeView === "generate" && (
             <div className="space-y-6 animate-fade-in">
@@ -960,9 +1149,11 @@ const Dashboard = ({ user, onLogout }) => {
                   <div className="flex flex-wrap gap-2">
                     <ExportBtn icon={<IconExcel />} label="Export Excel" accent="green"
                       disabled={!generatedTestCases.length}
+                      loading={loading.exporting === "excel:generated-test-cases"}
                       onClick={() => exportExcel(generatedTestCases, "generated-test-cases", "No generated test cases to export")} />
                     <ExportBtn icon={<IconPdf />} label="Export PDF" accent="sky"
                       disabled={!generatedTestCases.length}
+                      loading={loading.exporting === "pdf:generated-test-cases"}
                       onClick={() => exportPdf(generatedTestCases, "generated-test-cases", "Generated Test Cases", "No generated test cases to export")} />
                   </div>
                 </div>
@@ -979,6 +1170,7 @@ const Dashboard = ({ user, onLogout }) => {
                     onEdit={startEditing} onSave={handleSave}
                     onUpdateEdit={handleUpdate} onUpdateEditingCase={updateEditingCase}
                     onUpdateEditingProject={updateEditingProject}
+                    loading={loading}
                     projects={projects}
                     showSave testCases={generatedTestCases}
                   />
@@ -1005,7 +1197,9 @@ const Dashboard = ({ user, onLogout }) => {
                     <span className="text-sm font-medium text-slate-400">Description</span>
                     <input className="input-dark" name="description" onChange={updateProjectForm} placeholder="Optional project notes" value={projectForm.description} />
                   </label>
-                  <button className="btn-primary whitespace-nowrap" type="submit">Create Project</button>
+                  <button className="btn-primary whitespace-nowrap inline-flex items-center justify-center gap-2" disabled={loading.projectCreate} type="submit">
+                    {loading.projectCreate ? <><span className="spinner" /> Saving...</> : "Create Project"}
+                  </button>
                 </div>
               </form>
 
@@ -1049,10 +1243,10 @@ const Dashboard = ({ user, onLogout }) => {
                           <div className="flex flex-wrap gap-2">
                             {isEditingProject ? (
                               <>
-                                <button className="btn-primary inline-flex items-center gap-1.5 px-3 py-1.5 text-xs" onClick={() => handleUpdateProject(project.id)} type="button">
-                                  <IconCheck /> Save
+                                <button className="btn-primary inline-flex items-center gap-1.5 px-3 py-1.5 text-xs" disabled={loading.projectUpdateId === project.id} onClick={() => handleUpdateProject(project.id)} type="button">
+                                  {loading.projectUpdateId === project.id ? <><span className="spinner" /> Saving...</> : <><IconCheck /> Save</>}
                                 </button>
-                                <button className="btn-ghost inline-flex items-center gap-1.5 px-3 py-1.5 text-xs" onClick={cancelEditingProject} type="button">
+                                <button className="btn-ghost inline-flex items-center gap-1.5 px-3 py-1.5 text-xs" disabled={loading.projectUpdateId === project.id} onClick={cancelEditingProject} type="button">
                                   <IconX /> Cancel
                                 </button>
                               </>
@@ -1066,8 +1260,8 @@ const Dashboard = ({ user, onLogout }) => {
                                 >
                                   <IconEdit /> Edit
                                 </button>
-                                <button className="btn-danger inline-flex items-center gap-1.5" onClick={() => handleDeleteProject(project)} type="button">
-                                  <IconTrash /> Delete
+                                <button className="btn-danger inline-flex items-center gap-1.5" disabled={loading.projectDeleteId === project.id} onClick={() => handleDeleteProject(project)} type="button">
+                                  {loading.projectDeleteId === project.id ? <><span className="spinner" /> Deleting...</> : <><IconTrash /> Delete</>}
                                 </button>
                               </>
                             )}
@@ -1093,9 +1287,11 @@ const Dashboard = ({ user, onLogout }) => {
                   <div className="flex flex-wrap gap-2">
                     <ExportBtn icon={<IconExcel />} label="Export Selected (Excel)" accent="green"
                       disabled={!selectedSavedTestCases.length}
+                      loading={loading.exporting === "excel:saved-test-cases"}
                       onClick={() => exportExcel(selectedSavedTestCases, "saved-test-cases", "Select saved test cases to export")} />
                     <ExportBtn icon={<IconPdf />} label="Export Selected (PDF)" accent="sky"
                       disabled={!selectedSavedTestCases.length}
+                      loading={loading.exporting === "pdf:saved-test-cases"}
                       onClick={() => exportPdf(selectedSavedTestCases, "saved-test-cases", "Saved Test Cases Report", "Select saved test cases to export")} />
                   </div>
                 </div>
@@ -1151,6 +1347,7 @@ const Dashboard = ({ user, onLogout }) => {
                     onToggleSelected={toggleSavedSelection}
                     onUpdateEdit={handleUpdate} onUpdateEditingCase={updateEditingCase}
                     onUpdateEditingProject={updateEditingProject}
+                    loading={loading}
                     projects={projects}
                     selectable selectedIds={selectedSavedIds}
                     testCases={filteredSavedTestCases}
@@ -1164,7 +1361,7 @@ const Dashboard = ({ user, onLogout }) => {
           {activeView === "dashboard" && (
             <div className="space-y-8 animate-fade-in">
               {/* Stat cards */}
-              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-5">
+              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                 <StatCard
                   label="Total Projects" value={savedSummary.projects}
                   description="Project workspaces available for generated and saved cases."
@@ -1172,73 +1369,128 @@ const Dashboard = ({ user, onLogout }) => {
                   icon={<IconProjects />}
                 />
                 <StatCard
-                  label="Total Test Cases" value={savedSummary.total}
+                  label="Total Saved Test Cases" value={savedSummary.total}
                   description="All saved cases available for review and export."
                   glowColor="#6366f1"
                   icon={<svg width="20" height="20" fill="none" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1" stroke="#818cf8" strokeWidth="1.8"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="#818cf8" strokeWidth="1.8"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="#818cf8" strokeWidth="1.8"/><rect x="14" y="14" width="7" height="7" rx="1" stroke="#818cf8" strokeWidth="1.8"/></svg>}
                 />
                 <StatCard
-                  label="High Priority" value={savedSummary.High}
+                  label="Total Modules" value={savedSummary.modules}
+                  description="Unique modules represented in saved test cases."
+                  glowColor="#38bdf8"
+                  icon={<svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h16" stroke="#38bdf8" strokeWidth="1.8" strokeLinecap="round"/><path d="M8 3v4M16 10v4M12 17v4" stroke="#38bdf8" strokeWidth="1.8" strokeLinecap="round"/></svg>}
+                />
+                <StatCard
+                  label="High Priority Test Cases" value={savedSummary.High}
                   description="Critical scenarios that should be tested first."
                   glowColor="#ef4444"
                   icon={<svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke="#f87171" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                 />
                 <StatCard
-                  label="Medium Priority" value={savedSummary.Medium}
+                  label="Medium Priority Test Cases" value={savedSummary.Medium}
                   description="Important coverage for common user workflows."
                   glowColor="#f59e0b"
                   icon={<svg width="20" height="20" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="#fbbf24" strokeWidth="1.8"/><path d="M12 8v4M12 16h.01" stroke="#fbbf24" strokeWidth="2" strokeLinecap="round"/></svg>}
                 />
                 <StatCard
-                  label="Low Priority" value={savedSummary.Low}
+                  label="Low Priority Test Cases" value={savedSummary.Low}
                   description="Lower-risk checks for broader QA completeness."
                   glowColor="#22c55e"
                   icon={<svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4" stroke="#4ade80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><circle cx="12" cy="12" r="9" stroke="#4ade80" strokeWidth="1.8"/></svg>}
                 />
               </div>
 
-              {/* Priority Distribution Bar */}
-              {savedSummary.total > 0 && (
+              <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
                 <div className="rounded-2xl p-6" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
                   <h3 className="text-base font-semibold text-slate-200 mb-1">Priority Distribution</h3>
-                  <p className="text-sm text-slate-500 mb-6">Visual breakdown of test case priorities</p>
+                  <p className="text-sm text-slate-500 mb-6">High, medium and low priority saved test cases</p>
+                  <div className="h-72">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={priorityChartData} margin={{ top: 8, right: 12, left: -18, bottom: 0 }}>
+                        <CartesianGrid stroke="rgba(255,255,255,0.06)" vertical={false} />
+                        <XAxis dataKey="name" stroke="#64748b" tick={{ fill: "#94a3b8", fontSize: 12 }} tickLine={false} axisLine={false} />
+                        <YAxis allowDecimals={false} stroke="#64748b" tick={{ fill: "#94a3b8", fontSize: 12 }} tickLine={false} axisLine={false} />
+                        <Tooltip
+                          cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                          contentStyle={{
+                            background: "rgba(15,23,42,0.96)",
+                            border: "1px solid rgba(255,255,255,0.08)",
+                            borderRadius: 12,
+                            color: "#e2e8f0"
+                          }}
+                          labelStyle={{ color: "#cbd5e1" }}
+                        />
+                        <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+                          {priorityChartData.map((entry) => (
+                            <Cell fill={entry.fill} key={entry.name} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                <div className="rounded-2xl p-6" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                  <h3 className="text-base font-semibold text-slate-200 mb-1">Analytics Snapshot</h3>
+                  <p className="text-sm text-slate-500 mb-6">Current QA library composition</p>
                   <div className="space-y-4">
-                    {[
-                      { label: "High", value: savedSummary.High, color: "#ef4444", bg: "rgba(239,68,68,0.2)" },
-                      { label: "Medium", value: savedSummary.Medium, color: "#f59e0b", bg: "rgba(245,158,11,0.2)" },
-                      { label: "Low", value: savedSummary.Low, color: "#22c55e", bg: "rgba(34,197,94,0.2)" }
-                    ].map(({ label, value, color, bg }) => (
-                      <div key={label} className="flex items-center gap-4">
-                        <span className="text-sm text-slate-400 w-16 shrink-0">{label}</span>
-                        <div className="flex-1 rounded-full h-2.5 overflow-hidden" style={{ background: "rgba(255,255,255,0.05)" }}>
-                          <div
-                            className="h-full rounded-full transition-all duration-700"
-                            style={{
-                              width: `${savedSummary.total ? (value / savedSummary.total) * 100 : 0}%`,
-                              background: `linear-gradient(90deg, ${color}, ${color}99)`,
-                              boxShadow: `0 0 8px ${color}80`
-                            }}
-                          />
+                    {priorityChartData.map((item) => (
+                      <div key={item.name} className="flex items-center justify-between rounded-xl p-3" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                        <div className="flex items-center gap-3">
+                          <span className="h-3 w-3 rounded-full" style={{ background: item.fill, boxShadow: `0 0 10px ${item.fill}80` }} />
+                          <span className="text-sm font-medium text-slate-300">{item.name}</span>
                         </div>
-                        <span className="text-sm font-semibold text-slate-300 w-8 text-right">{value}</span>
-                        <span className="text-xs text-slate-600 w-10 text-right">
-                          {savedSummary.total ? Math.round((value / savedSummary.total) * 100) : 0}%
-                        </span>
+                        <span className="text-sm font-bold text-slate-100">{item.value}</span>
                       </div>
                     ))}
                   </div>
                 </div>
-              )}
+              </div>
 
-              {savedSummary.total === 0 && (
-                <div className="rounded-2xl" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
-                  <EmptyState
-                    title="No data yet"
-                    description="Generate and save test cases to see your analytics dashboard."
-                    icon={<svg width="24" height="24" fill="none" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1" stroke="#4ade80" strokeWidth="1.8"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="#4ade80" strokeWidth="1.8"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="#4ade80" strokeWidth="1.8"/><rect x="14" y="14" width="7" height="7" rx="1" stroke="#4ade80" strokeWidth="1.8"/></svg>}
+              <div>
+                <h3 className="text-base font-semibold text-slate-200 mb-4">Recent Activity</h3>
+                <div className="grid gap-5 xl:grid-cols-3">
+                  <ActivityPanel
+                    emptyText="No projects created yet."
+                    items={recentProjects}
+                    title="Recently Created Projects"
+                    renderItem={(project) => (
+                      <ActivityItem
+                        badge="Project"
+                        key={project.id}
+                        meta={formatActivityDate(project.createdAt)}
+                        title={project.name}
+                      />
+                    )}
+                  />
+                  <ActivityPanel
+                    emptyText="No saved test cases yet."
+                    items={recentlySavedTestCases}
+                    title="Recently Saved Test Cases"
+                    renderItem={(testCase) => (
+                      <ActivityItem
+                        badge={testCase.priority}
+                        key={testCase.id}
+                        meta={`${testCase.projectName || "No project"} - ${formatActivityDate(testCase.createdAt)}`}
+                        title={testCase.testCaseId || testCase.testScenario}
+                      />
+                    )}
+                  />
+                  <ActivityPanel
+                    emptyText="No updated test cases yet."
+                    items={recentlyUpdatedTestCases}
+                    title="Recently Updated Test Cases"
+                    renderItem={(testCase) => (
+                      <ActivityItem
+                        badge={testCase.priority}
+                        key={testCase.id}
+                        meta={`${testCase.projectName || "No project"} - ${formatActivityDate(testCase.updatedAt)}`}
+                        title={testCase.testCaseId || testCase.testScenario}
+                      />
+                    )}
                   />
                 </div>
-              )}
+              </div>
             </div>
           )}
 

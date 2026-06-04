@@ -111,7 +111,7 @@ const AuthForm = ({ mode, onSubmit, isLoading, error }) => {
         {isLoading ? (
           <>
             <span className="spinner" />
-            Please wait...
+            {isRegister ? "Creating account..." : "Signing in..."}
           </>
         ) : isRegister ? (
           <>

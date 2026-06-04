@@ -185,6 +185,30 @@ const buildTestCases = ({ projectId, projectName, moduleName, featureDescription
 const getUserCases = (userId) => savedTestCasesByUser.get(userId) || [];
 const setUserCases = (userId, testCases) => savedTestCasesByUser.set(userId, testCases);
 
+export const detachProjectFromSavedTestCases = (userId, projectId, fallbackProjectName) => {
+  const userCases = getUserCases(String(userId));
+  let changed = false;
+
+  const nextCases = userCases.map((testCase) => {
+    if (String(testCase.projectId || "") !== String(projectId)) {
+      return testCase;
+    }
+
+    changed = true;
+    return {
+      ...testCase,
+      projectId: "",
+      projectName: fallbackProjectName ? `${fallbackProjectName} (deleted)` : "Deleted project"
+    };
+  });
+
+  if (changed) {
+    setUserCases(String(userId), nextCases);
+  }
+
+  return changed;
+};
+
 router.get("/", protect, (req, res) => {
   res.json({
     tests: getUserCases(req.user.id)
@@ -255,7 +279,13 @@ router.post("/", protect, async (req, res) => {
 
   const userCases = getUserCases(req.user.id);
   const existingIndex = userCases.findIndex((item) => item.id === testCase.id);
-  const savedCase = { ...testCase, saved: true };
+  const now = new Date().toISOString();
+  const savedCase = {
+    ...testCase,
+    createdAt: testCase.createdAt || userCases[existingIndex]?.createdAt || now,
+    updatedAt: now,
+    saved: true
+  };
 
   if (existingIndex >= 0) {
     userCases[existingIndex] = savedCase;
@@ -296,6 +326,8 @@ router.put("/:id", protect, async (req, res) => {
     ...userCases[testCaseIndex],
     ...updates,
     id: userCases[testCaseIndex].id,
+    createdAt: userCases[testCaseIndex].createdAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
     saved: true
   };
   setUserCases(req.user.id, userCases);

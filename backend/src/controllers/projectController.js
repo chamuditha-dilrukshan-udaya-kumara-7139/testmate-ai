@@ -1,4 +1,5 @@
 import Project from "../models/Project.js";
+import { detachProjectFromSavedTestCases } from "../routes/testRoutes.js";
 
 const projectResponse = (project) => ({
   id: project._id,
@@ -79,6 +80,8 @@ export const deleteProject = async (req, res) => {
     if (!project) {
       return res.status(404).json({ message: "Project not found" });
     }
+
+    detachProjectFromSavedTestCases(req.user._id, project._id, project.name);
 
     res.json({ message: "Project deleted", project: projectResponse(project) });
   } catch (error) {

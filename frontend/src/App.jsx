@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import { ToastContainer, toast } from "react-toastify";
 import api from "./api/client.js";
 import AuthPage from "./pages/AuthPage.jsx";
 import Dashboard from "./pages/Dashboard.jsx";
+import "react-toastify/dist/ReactToastify.css";
 
 const App = () => {
   const [mode, setMode] = useState("login");
@@ -45,8 +47,11 @@ const App = () => {
 
       localStorage.setItem("testmate_token", data.token);
       setUser(data.user);
+      toast.success(mode === "register" ? "Registration successful" : "Login successful");
     } catch (requestError) {
-      setError(requestError.response?.data?.message || "Authentication failed");
+      const message = requestError.response?.data?.message || "Authentication failed";
+      setError(message);
+      toast.error(mode === "register" ? `Register failed: ${message}` : `Login failed: ${message}`);
     } finally {
       setIsLoading(false);
     }
@@ -58,18 +63,29 @@ const App = () => {
     setMode("login");
   };
 
-  if (user) {
-    return <Dashboard user={user} onLogout={handleLogout} />;
-  }
-
   return (
-    <AuthPage
-      mode={mode}
-      onModeChange={setMode}
-      onSubmit={handleAuth}
-      isLoading={isLoading}
-      error={error}
-    />
+    <>
+      {user ? (
+        <Dashboard user={user} onLogout={handleLogout} />
+      ) : (
+        <AuthPage
+          mode={mode}
+          onModeChange={setMode}
+          onSubmit={handleAuth}
+          isLoading={isLoading}
+          error={error}
+        />
+      )}
+      <ToastContainer
+        autoClose={3200}
+        closeOnClick
+        draggable={false}
+        newestOnTop
+        pauseOnFocusLoss={false}
+        position="top-right"
+        theme="dark"
+      />
+    </>
   );
 };
 
