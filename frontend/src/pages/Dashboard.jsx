@@ -8,12 +8,14 @@ import testmateLogo from "../assets/testmate-logo.png";
    Constants
 ──────────────────────────────────────────────────────────────── */
 const initialForm = {
+  projectId: "",
   projectName: "",
   moduleName: "",
   featureDescription: "",
   numberOfTestCases: 5
 };
 
+const initialProjectForm = { name: "", description: "" };
 const initialFilters = { search: "", priority: "", moduleName: "" };
 const priorities = ["High", "Medium", "Low"];
 
@@ -153,6 +155,12 @@ const IconDashboard = () => (
     <rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.8"/>
   </svg>
 );
+const IconProjects = () => (
+  <svg width="18" height="18" fill="none" viewBox="0 0 24 24">
+    <path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M8 13h8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+  </svg>
+);
 const IconLogout = () => (
   <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
@@ -234,7 +242,8 @@ const EmptyState = ({ title, description, icon }) => (
 ──────────────────────────────────────────────────────────────── */
 const TestCasesTable = ({
   testCases, editingCase, editingId,
-  onCancelEdit, onDelete, onEdit, onSave, onUpdateEdit, onUpdateEditingCase,
+  onCancelEdit, onDelete, onEdit, onSave, onUpdateEdit, onUpdateEditingCase, onUpdateEditingProject,
+  projects = [],
   selectable = false, selectedIds = [], onToggleSelected, onToggleAll,
   showSave = false
 }) => {
@@ -284,7 +293,13 @@ const TestCasesTable = ({
                 )}
                 <td className="px-5 py-4">
                   {isEditing ? (
-                    <input className="input-dark text-xs" name="projectName" onChange={onUpdateEditingCase} value={editingCase.projectName} />
+                    <select className="input-dark text-xs" name="projectId" onChange={onUpdateEditingProject} value={editingCase.projectId || ""}>
+                      {!editingCase.projectId && editingCase.projectName && (
+                        <option value="">{editingCase.projectName}</option>
+                      )}
+                      <option value="" disabled>Select project</option>
+                      {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+                    </select>
                   ) : (
                     <span className="text-slate-300">{tc.projectName}</span>
                   )}
@@ -449,6 +464,10 @@ const ExportBtn = ({ icon, label, onClick, disabled, accent = "slate" }) => {
 const Dashboard = ({ user, onLogout }) => {
   const [activeView, setActiveView] = useState("generate");
   const [form, setForm] = useState(initialForm);
+  const [projects, setProjects] = useState([]);
+  const [projectForm, setProjectForm] = useState(initialProjectForm);
+  const [editingProjectId, setEditingProjectId] = useState("");
+  const [editingProjectForm, setEditingProjectForm] = useState(initialProjectForm);
   const [generatedTestCases, setGeneratedTestCases] = useState([]);
   const [savedTestCases, setSavedTestCases] = useState([]);
   const [selectedSavedIds, setSelectedSavedIds] = useState([]);
@@ -460,17 +479,21 @@ const Dashboard = ({ user, onLogout }) => {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    api.get("/tests")
-      .then(({ data }) => setSavedTestCases(data.tests))
-      .catch((e) => setError(e.response?.data?.message || "Could not load saved test cases"));
+    Promise.all([api.get("/tests"), api.get("/projects")])
+      .then(([testsResponse, projectsResponse]) => {
+        setSavedTestCases(testsResponse.data.tests);
+        setProjects(projectsResponse.data.projects);
+      })
+      .catch((e) => setError(e.response?.data?.message || "Could not load dashboard data"));
   }, []);
 
   const savedSummary = useMemo(() => ({
+    projects: projects.length,
     total: savedTestCases.length,
     High:   savedTestCases.filter((tc) => tc.priority === "High").length,
     Medium: savedTestCases.filter((tc) => tc.priority === "Medium").length,
     Low:    savedTestCases.filter((tc) => tc.priority === "Low").length
-  }), [savedTestCases]);
+  }), [projects.length, savedTestCases]);
 
   const moduleOptions = useMemo(
     () => [...new Set(savedTestCases.map((tc) => tc.moduleName).filter(Boolean))].sort(),
@@ -480,7 +503,7 @@ const Dashboard = ({ user, onLogout }) => {
   const filteredSavedTestCases = useMemo(() => {
     const q = filters.search.trim().toLowerCase();
     return savedTestCases.filter((tc) =>
-      (!q || tc.projectName.toLowerCase().includes(q) || tc.moduleName.toLowerCase().includes(q) || tc.testScenario.toLowerCase().includes(q)) &&
+      (!q || (tc.projectName || "").toLowerCase().includes(q) || (tc.moduleName || "").toLowerCase().includes(q) || (tc.testScenario || "").toLowerCase().includes(q)) &&
       (!filters.priority || tc.priority === filters.priority) &&
       (!filters.moduleName || tc.moduleName === filters.moduleName)
     );
@@ -493,7 +516,24 @@ const Dashboard = ({ user, onLogout }) => {
 
   const updateForm = (e) => {
     const { name, value } = e.target;
-    setForm((f) => ({ ...f, [name]: value }));
+    setForm((f) => {
+      if (name === "projectId") {
+        const project = projects.find((item) => item.id === value);
+        return { ...f, projectId: value, projectName: project?.name || "" };
+      }
+
+      return { ...f, [name]: value };
+    });
+  };
+
+  const updateProjectForm = (e) => {
+    const { name, value } = e.target;
+    setProjectForm((f) => ({ ...f, [name]: value }));
+  };
+
+  const updateEditingProjectForm = (e) => {
+    const { name, value } = e.target;
+    setEditingProjectForm((f) => ({ ...f, [name]: value }));
   };
 
   const updateFilters = (e) => {
@@ -503,9 +543,73 @@ const Dashboard = ({ user, onLogout }) => {
 
   const clearFilters = () => { setFilters(initialFilters); setSelectedSavedIds([]); };
 
+  const syncProjectName = (project) => {
+    setGeneratedTestCases((cur) => cur.map((tc) => (
+      tc.projectId === project.id ? { ...tc, projectName: project.name } : tc
+    )));
+    setSavedTestCases((cur) => cur.map((tc) => (
+      tc.projectId === project.id ? { ...tc, projectName: project.name } : tc
+    )));
+    setForm((cur) => cur.projectId === project.id ? { ...cur, projectName: project.name } : cur);
+  };
+
+  const handleCreateProject = async (e) => {
+    e.preventDefault();
+    setError(""); setMessage("");
+    try {
+      const { data } = await api.post("/projects", projectForm);
+      setProjects((cur) => [data.project, ...cur]);
+      setProjectForm(initialProjectForm);
+      setMessage(`${data.project.name} created.`);
+    } catch (err) {
+      setError(err.response?.data?.message || "Could not create project");
+    }
+  };
+
+  const startEditingProject = (project) => {
+    setEditingProjectId(project.id);
+    setEditingProjectForm({ name: project.name, description: project.description || "" });
+    setError(""); setMessage("");
+  };
+
+  const cancelEditingProject = () => {
+    setEditingProjectId("");
+    setEditingProjectForm(initialProjectForm);
+  };
+
+  const handleUpdateProject = async (projectId) => {
+    setError(""); setMessage("");
+    try {
+      const { data } = await api.put(`/projects/${projectId}`, editingProjectForm);
+      setProjects((cur) => cur.map((project) => project.id === projectId ? data.project : project));
+      syncProjectName(data.project);
+      cancelEditingProject();
+      setMessage(`${data.project.name} updated.`);
+    } catch (err) {
+      setError(err.response?.data?.message || "Could not update project");
+    }
+  };
+
+  const handleDeleteProject = async (project) => {
+    setError(""); setMessage("");
+    try {
+      await api.delete(`/projects/${project.id}`);
+      setProjects((cur) => cur.filter((item) => item.id !== project.id));
+      setForm((cur) => cur.projectId === project.id ? { ...cur, projectId: "", projectName: "" } : cur);
+      setMessage(`${project.name} deleted.`);
+    } catch (err) {
+      setError(err.response?.data?.message || "Could not delete project");
+    }
+  };
+
   const handleGenerate = async (e) => {
     e.preventDefault();
     setIsGenerating(true); setError(""); setMessage(""); setEditingId(""); setEditingCase(null);
+    if (!form.projectId) {
+      setError("Select a project before generating test cases");
+      setIsGenerating(false);
+      return;
+    }
     try {
       const { data } = await api.post("/tests/generate", form);
       setGeneratedTestCases(data.testCases);
@@ -542,6 +646,15 @@ const Dashboard = ({ user, onLogout }) => {
   const updateEditingCase = (e) => {
     const { name, value } = e.target;
     setEditingCase((cur) => ({ ...cur, [name]: value }));
+  };
+
+  const updateEditingProject = (e) => {
+    const project = projects.find((item) => item.id === e.target.value);
+    setEditingCase((cur) => ({
+      ...cur,
+      projectId: project?.id || "",
+      projectName: project?.name || cur.projectName
+    }));
   };
 
   const cancelEditing = () => { setEditingId(""); setEditingCase(null); };
@@ -612,12 +725,14 @@ const Dashboard = ({ user, onLogout }) => {
   /* ── Nav items ── */
   const navItems = [
     { id: "generate",  label: "Generate",     icon: <IconGenerate /> },
+    { id: "projects",  label: "Projects",     icon: <IconProjects /> },
     { id: "saved",     label: "Saved Cases",  icon: <IconSaved /> },
     { id: "dashboard", label: "Dashboard",    icon: <IconDashboard /> }
   ];
 
   const pageMeta = {
     generate:  { title: "Generate Test Cases",  sub: "Describe a feature and create structured QA test cases instantly with AI." },
+    projects:  { title: "Projects",             sub: "Create and manage project workspaces for your QA test cases." },
     saved:     { title: "Saved Test Cases",     sub: "Search, filter, edit and export your saved QA library." },
     dashboard: { title: "Analytics Dashboard",  sub: "Review your test case totals and priority distribution at a glance." }
   };
@@ -764,15 +879,30 @@ const Dashboard = ({ user, onLogout }) => {
               >
                 <h3 className="text-base font-semibold text-slate-200 mb-5">Feature Details</h3>
                 <div className="grid gap-5 md:grid-cols-2">
-                  <label className="space-y-2">
-                    <span className="text-sm font-medium text-slate-400">Project Name</span>
-                    <input
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm font-medium text-slate-400">Project</span>
+                      <button
+                        className="text-xs font-semibold text-green-400 hover:text-green-300"
+                        onClick={() => setActiveView("projects")}
+                        type="button"
+                      >
+                        Manage Projects
+                      </button>
+                    </div>
+                    <select
                       className="input-dark"
-                      name="projectName" onChange={updateForm}
-                      placeholder="e.g. Online Banking App"
-                      required type="text" value={form.projectName}
-                    />
-                  </label>
+                      name="projectId"
+                      onChange={updateForm}
+                      required
+                      value={form.projectId}
+                    >
+                      <option value="">Select a project</option>
+                      {projects.map((project) => (
+                        <option key={project.id} value={project.id}>{project.name}</option>
+                      ))}
+                    </select>
+                  </div>
                   <label className="space-y-2">
                     <span className="text-sm font-medium text-slate-400">Module Name</span>
                     <input
@@ -848,6 +978,8 @@ const Dashboard = ({ user, onLogout }) => {
                     onCancelEdit={cancelEditing} onDelete={handleDelete}
                     onEdit={startEditing} onSave={handleSave}
                     onUpdateEdit={handleUpdate} onUpdateEditingCase={updateEditingCase}
+                    onUpdateEditingProject={updateEditingProject}
+                    projects={projects}
                     showSave testCases={generatedTestCases}
                   />
                 )}
@@ -856,6 +988,99 @@ const Dashboard = ({ user, onLogout }) => {
           )}
 
           {/* ══════════ SAVED VIEW ══════════ */}
+          {activeView === "projects" && (
+            <div className="space-y-6 animate-fade-in">
+              <form
+                className="rounded-2xl p-6"
+                style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}
+                onSubmit={handleCreateProject}
+              >
+                <h3 className="text-base font-semibold text-slate-200 mb-5">Create Project</h3>
+                <div className="grid gap-5 md:grid-cols-[1fr_1.5fr_auto] md:items-end">
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium text-slate-400">Project Name</span>
+                    <input className="input-dark" name="name" onChange={updateProjectForm} placeholder="e.g. Online Banking App" required value={projectForm.name} />
+                  </label>
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium text-slate-400">Description</span>
+                    <input className="input-dark" name="description" onChange={updateProjectForm} placeholder="Optional project notes" value={projectForm.description} />
+                  </label>
+                  <button className="btn-primary whitespace-nowrap" type="submit">Create Project</button>
+                </div>
+              </form>
+
+              <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                <div className="px-6 py-5" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                  <h3 className="text-base font-semibold text-slate-200">All Projects</h3>
+                  <p className="text-sm text-slate-500">{projects.length} total</p>
+                </div>
+
+                {projects.length === 0 ? (
+                  <EmptyState
+                    title="No projects yet"
+                    description="Create a project to group generated and saved test cases."
+                    icon={<IconProjects />}
+                  />
+                ) : (
+                  <div className="divide-y" style={{ borderColor: "rgba(255,255,255,0.06)" }}>
+                    {projects.map((project) => {
+                      const isEditingProject = editingProjectId === project.id;
+                      const caseCount = savedTestCases.filter((tc) => tc.projectId === project.id).length;
+
+                      return (
+                        <div className="grid gap-4 p-5 lg:grid-cols-[1fr_auto] lg:items-center" key={project.id}>
+                          {isEditingProject ? (
+                            <div className="grid gap-3 md:grid-cols-[1fr_1.5fr]">
+                              <input className="input-dark" name="name" onChange={updateEditingProjectForm} value={editingProjectForm.name} />
+                              <input className="input-dark" name="description" onChange={updateEditingProjectForm} value={editingProjectForm.description} />
+                            </div>
+                          ) : (
+                            <div>
+                              <div className="flex flex-wrap items-center gap-3">
+                                <h4 className="text-base font-semibold text-slate-200">{project.name}</h4>
+                                <span className="rounded-full px-2.5 py-1 text-xs font-semibold text-green-400" style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.18)" }}>
+                                  {caseCount} saved cases
+                                </span>
+                              </div>
+                              <p className="mt-1 text-sm text-slate-500">{project.description || "No description"}</p>
+                            </div>
+                          )}
+
+                          <div className="flex flex-wrap gap-2">
+                            {isEditingProject ? (
+                              <>
+                                <button className="btn-primary inline-flex items-center gap-1.5 px-3 py-1.5 text-xs" onClick={() => handleUpdateProject(project.id)} type="button">
+                                  <IconCheck /> Save
+                                </button>
+                                <button className="btn-ghost inline-flex items-center gap-1.5 px-3 py-1.5 text-xs" onClick={cancelEditingProject} type="button">
+                                  <IconX /> Cancel
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium transition-all duration-200"
+                                  style={{ background: "rgba(148,163,184,0.08)", color: "#94a3b8", border: "1px solid rgba(148,163,184,0.15)" }}
+                                  onClick={() => startEditingProject(project)}
+                                  type="button"
+                                >
+                                  <IconEdit /> Edit
+                                </button>
+                                <button className="btn-danger inline-flex items-center gap-1.5" onClick={() => handleDeleteProject(project)} type="button">
+                                  <IconTrash /> Delete
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {activeView === "saved" && (
             <div className="space-y-6 animate-fade-in">
               {/* Filters */}
@@ -925,6 +1150,8 @@ const Dashboard = ({ user, onLogout }) => {
                     onEdit={startEditing} onToggleAll={toggleAllVisibleSaved}
                     onToggleSelected={toggleSavedSelection}
                     onUpdateEdit={handleUpdate} onUpdateEditingCase={updateEditingCase}
+                    onUpdateEditingProject={updateEditingProject}
+                    projects={projects}
                     selectable selectedIds={selectedSavedIds}
                     testCases={filteredSavedTestCases}
                   />
@@ -937,7 +1164,13 @@ const Dashboard = ({ user, onLogout }) => {
           {activeView === "dashboard" && (
             <div className="space-y-8 animate-fade-in">
               {/* Stat cards */}
-              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-5">
+                <StatCard
+                  label="Total Projects" value={savedSummary.projects}
+                  description="Project workspaces available for generated and saved cases."
+                  glowColor="#14b8a6"
+                  icon={<IconProjects />}
+                />
                 <StatCard
                   label="Total Test Cases" value={savedSummary.total}
                   description="All saved cases available for review and export."

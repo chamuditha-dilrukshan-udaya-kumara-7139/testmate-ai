@@ -1,5 +1,6 @@
 import express from "express";
 import { protect } from "../middleware/authMiddleware.js";
+import Project from "../models/Project.js";
 
 const router = express.Router();
 const savedTestCasesByUser = new Map();
@@ -157,7 +158,7 @@ const getRule = (featureDescription) => {
   return "generic";
 };
 
-const buildTestCases = ({ projectName, moduleName, featureDescription, count }) => {
+const buildTestCases = ({ projectId, projectName, moduleName, featureDescription, count }) => {
   const rule = getRule(featureDescription);
   const selectedTemplates = templates[rule];
 
@@ -168,6 +169,7 @@ const buildTestCases = ({ projectName, moduleName, featureDescription, count }) 
     return {
       id: `TC-${Date.now()}-${sequence}`,
       testCaseId: `TC-${sequence}`,
+      projectId,
       projectName,
       moduleName,
       featureDescription,
@@ -189,11 +191,11 @@ router.get("/", protect, (req, res) => {
   });
 });
 
-router.post("/generate", protect, (req, res) => {
-  const { projectName, moduleName, featureDescription, numberOfTestCases } = req.body;
+router.post("/generate", protect, async (req, res) => {
+  const { projectId, projectName, moduleName, featureDescription, numberOfTestCases } = req.body;
   const count = Number(numberOfTestCases);
 
-  if (!projectName || !moduleName || !featureDescription || !Number.isInteger(count)) {
+  if ((!projectId && !projectName) || !moduleName || !featureDescription || !Number.isInteger(count)) {
     return res.status(400).json({ message: "Project, module, feature description, and test case count are required" });
   }
 
@@ -201,21 +203,54 @@ router.post("/generate", protect, (req, res) => {
     return res.status(400).json({ message: "Number of test cases must be between 1 and 50" });
   }
 
-  res.status(201).json({
-    testCases: buildTestCases({
-      projectName: projectName.trim(),
-      moduleName: moduleName.trim(),
-      featureDescription: featureDescription.trim(),
-      count
-    })
-  });
+  try {
+    let selectedProjectName = projectName?.trim();
+
+    if (projectId) {
+      const project = await Project.findOne({ _id: projectId, user: req.user._id });
+
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      selectedProjectName = project.name;
+    }
+
+    res.status(201).json({
+      testCases: buildTestCases({
+        projectId: projectId || "",
+        projectName: selectedProjectName,
+        moduleName: moduleName.trim(),
+        featureDescription: featureDescription.trim(),
+        count
+      })
+    });
+  } catch (error) {
+    console.error("Generate test cases failed:", error);
+    res.status(500).json({ message: "Could not generate test cases" });
+  }
 });
 
-router.post("/", protect, (req, res) => {
+router.post("/", protect, async (req, res) => {
   const { testCase } = req.body;
 
   if (!testCase?.testCaseId || !testCase?.testScenario) {
     return res.status(400).json({ message: "A valid test case is required" });
+  }
+
+  try {
+    if (testCase.projectId) {
+      const project = await Project.findOne({ _id: testCase.projectId, user: req.user._id });
+
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      testCase.projectName = project.name;
+    }
+  } catch (error) {
+    console.error("Validate test case project failed:", error);
+    return res.status(500).json({ message: "Could not validate project" });
   }
 
   const userCases = getUserCases(req.user.id);
@@ -232,7 +267,7 @@ router.post("/", protect, (req, res) => {
   res.status(201).json({ testCase: savedCase });
 });
 
-router.put("/:id", protect, (req, res) => {
+router.put("/:id", protect, async (req, res) => {
   const userCases = getUserCases(req.user.id);
   const testCaseIndex = userCases.findIndex((testCase) => testCase.id === req.params.id);
 
@@ -240,9 +275,26 @@ router.put("/:id", protect, (req, res) => {
     return res.status(404).json({ message: "Test case not found" });
   }
 
+  const updates = { ...req.body };
+
+  try {
+    if (updates.projectId) {
+      const project = await Project.findOne({ _id: updates.projectId, user: req.user._id });
+
+      if (!project) {
+        return res.status(404).json({ message: "Project not found" });
+      }
+
+      updates.projectName = project.name;
+    }
+  } catch (error) {
+    console.error("Validate test case project failed:", error);
+    return res.status(500).json({ message: "Could not validate project" });
+  }
+
   userCases[testCaseIndex] = {
     ...userCases[testCaseIndex],
-    ...req.body,
+    ...updates,
     id: userCases[testCaseIndex].id,
     saved: true
   };
