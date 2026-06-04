@@ -4,6 +4,9 @@ import * as XLSX from "xlsx";
 import api from "../api/client.js";
 import testmateLogo from "../assets/testmate-logo.png";
 
+/* ────────────────────────────────────────────────────────────────
+   Constants
+──────────────────────────────────────────────────────────────── */
 const initialForm = {
   projectName: "",
   moduleName: "",
@@ -11,136 +14,63 @@ const initialForm = {
   numberOfTestCases: 5
 };
 
-const initialFilters = {
-  search: "",
-  priority: "",
-  moduleName: ""
-};
-
+const initialFilters = { search: "", priority: "", moduleName: "" };
 const priorities = ["High", "Medium", "Low"];
 
 const exportColumns = [
-  "Project Name",
-  "Module Name",
-  "Test Case ID",
-  "Test Scenario",
-  "Test Steps",
-  "Expected Result",
-  "Priority"
+  "Project Name", "Module Name", "Test Case ID",
+  "Test Scenario", "Test Steps", "Expected Result", "Priority"
 ];
 
-const formatSteps = (steps) =>
-  steps.map((step, index) => `${index + 1}. ${step}`).join("\n");
+/* ────────────────────────────────────────────────────────────────
+   Helpers
+──────────────────────────────────────────────────────────────── */
+const formatSteps = (steps) => steps.map((s, i) => `${i + 1}. ${s}`).join("\n");
 
 const getExportRows = (testCases) =>
-  testCases.map((testCase) => ({
-    "Project Name": testCase.projectName,
-    "Module Name": testCase.moduleName,
-    "Test Case ID": testCase.testCaseId,
-    "Test Scenario": testCase.testScenario,
-    "Test Steps": formatSteps(testCase.testSteps),
-    "Expected Result": testCase.expectedResult,
-    Priority: testCase.priority
+  testCases.map((tc) => ({
+    "Project Name": tc.projectName,
+    "Module Name": tc.moduleName,
+    "Test Case ID": tc.testCaseId,
+    "Test Scenario": tc.testScenario,
+    "Test Steps": formatSteps(tc.testSteps),
+    "Expected Result": tc.expectedResult,
+    Priority: tc.priority
   }));
 
-const getExportFileName = (testCases, extension, prefix = "test-cases") => {
-  const projectName = testCases[0]?.projectName || prefix;
-  const cleanProjectName = projectName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+const getExportFileName = (testCases, ext, prefix = "test-cases") => {
+  const name = testCases[0]?.projectName || prefix;
+  const clean = name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  return `${clean || prefix}-${prefix}.${ext}`;
+};
 
-  return `${cleanProjectName || prefix}-${prefix}.${extension}`;
+const getPriorityStyle = (priority) => {
+  const map = {
+    High:   "badge-high",
+    Medium: "badge-medium",
+    Low:    "badge-low"
+  };
+  return map[priority] || "badge-low";
 };
 
 const getPriorityBadgeClass = (priority) => {
   const classes = {
-    High: "bg-red-50 text-red-700 ring-red-100",
+    High:   "bg-red-50 text-red-700 ring-red-100",
     Medium: "bg-amber-50 text-amber-700 ring-amber-100",
-    Low: "bg-emerald-50 text-emerald-700 ring-emerald-100"
+    Low:    "bg-emerald-50 text-emerald-700 ring-emerald-100"
   };
-
   return classes[priority] || "bg-slate-50 text-slate-700 ring-slate-100";
 };
 
-const GeneratorIllustration = () => (
-  <svg
-    aria-hidden="true"
-    className="h-32 w-40 shrink-0"
-    fill="none"
-    viewBox="0 0 180 140"
-    xmlns="http://www.w3.org/2000/svg"
-  >
-    <rect height="96" rx="18" width="126" x="28" y="22" fill="#ECFDF5" />
-    <rect height="72" rx="12" width="92" x="44" y="38" fill="white" stroke="#10B981" strokeWidth="3" />
-    <path d="M58 58h45M58 74h62M58 90h34" stroke="#334155" strokeLinecap="round" strokeWidth="5" />
-    <circle cx="138" cy="38" fill="#14B8A6" r="16" />
-    <path d="M132 38l4 4 8-9" stroke="white" strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" />
-    <path d="M28 116c18-9 34-8 48 2 18 13 38 13 62-1" stroke="#A7F3D0" strokeLinecap="round" strokeWidth="6" />
-  </svg>
-);
-
-const EmptyStateIllustration = ({ accent = "emerald" }) => {
-  const colors = {
-    emerald: { bg: "#ECFDF5", stroke: "#10B981", soft: "#A7F3D0" },
-    teal: { bg: "#F0FDFA", stroke: "#14B8A6", soft: "#99F6E4" }
-  };
-  const color = colors[accent] || colors.emerald;
-
-  return (
-    <svg
-      aria-hidden="true"
-      className="mx-auto h-28 w-36"
-      fill="none"
-      viewBox="0 0 160 120"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <rect height="74" rx="16" width="104" x="28" y="22" fill={color.bg} />
-      <rect height="52" rx="10" width="76" x="42" y="36" fill="white" stroke={color.stroke} strokeWidth="3" />
-      <path d="M55 53h46M55 66h34M55 79h50" stroke="#64748B" strokeLinecap="round" strokeWidth="4" />
-      <circle cx="124" cy="28" fill={color.soft} r="10" />
-      <path d="M31 100c22-8 44-8 66 0 12 4 23 4 34-1" stroke={color.soft} strokeLinecap="round" strokeWidth="5" />
-    </svg>
-  );
-};
-
-const SummaryIcon = ({ tone }) => {
-  const tones = {
-    total: "bg-sky-50 text-sky-700 ring-sky-100",
-    high: "bg-red-50 text-red-700 ring-red-100",
-    medium: "bg-amber-50 text-amber-700 ring-amber-100",
-    low: "bg-emerald-50 text-emerald-700 ring-emerald-100"
-  };
-
-  return (
-    <div className={`flex h-11 w-11 items-center justify-center rounded-xl ring-1 ${tones[tone]}`}>
-      <svg aria-hidden="true" className="h-5 w-5" fill="none" viewBox="0 0 24 24">
-        <path
-          d="M7 7h10M7 12h10M7 17h6"
-          stroke="currentColor"
-          strokeLinecap="round"
-          strokeWidth="2"
-        />
-        <rect height="18" rx="3" stroke="currentColor" strokeWidth="2" width="14" x="5" y="3" />
-      </svg>
-    </div>
-  );
-};
-
+/* ────────────────────────────────────────────────────────────────
+   Excel / PDF Export
+──────────────────────────────────────────────────────────────── */
 const createExcelExport = (testCases, filePrefix) => {
-  const worksheet = XLSX.utils.json_to_sheet(getExportRows(testCases), {
-    header: exportColumns
-  });
-  worksheet["!cols"] = [
-    { wch: 22 },
-    { wch: 22 },
-    { wch: 14 },
-    { wch: 36 },
-    { wch: 48 },
-    { wch: 42 },
-    { wch: 12 }
-  ];
-
-  const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, "Test Cases");
-  XLSX.writeFile(workbook, getExportFileName(testCases, "xlsx", filePrefix));
+  const ws = XLSX.utils.json_to_sheet(getExportRows(testCases), { header: exportColumns });
+  ws["!cols"] = [{ wch: 22 }, { wch: 22 }, { wch: 14 }, { wch: 36 }, { wch: 48 }, { wch: 42 }, { wch: 12 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Test Cases");
+  XLSX.writeFile(wb, getExportFileName(testCases, "xlsx", filePrefix));
 };
 
 const createPdfExport = (testCases, filePrefix, title) => {
@@ -148,290 +78,305 @@ const createPdfExport = (testCases, filePrefix, title) => {
   const rows = getExportRows(testCases);
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const margin = 12;
-  const rowPadding = 2.5;
-  const lineHeight = 4.8;
-  const tableTop = 34;
-  const footerTop = pageHeight - 8;
+  const margin = 12, rowPadding = 2.5, lineHeight = 4.8, tableTop = 34, footerTop = pageHeight - 8;
   const generatedDate = new Date().toLocaleDateString();
-  const projectNames = [...new Set(testCases.map((testCase) => testCase.projectName).filter(Boolean))];
+  const projectNames = [...new Set(testCases.map((tc) => tc.projectName).filter(Boolean))];
   const projectName = projectNames.length === 1 ? projectNames[0] : "Multiple Projects";
   const columns = [
-    { label: "Project Name", width: 30 },
-    { label: "Module Name", width: 30 },
-    { label: "Test Case ID", width: 22 },
-    { label: "Test Scenario", width: 52 },
-    { label: "Test Steps", width: 58 },
-    { label: "Expected Result", width: 65 },
+    { label: "Project Name", width: 30 }, { label: "Module Name", width: 30 },
+    { label: "Test Case ID", width: 22 }, { label: "Test Scenario", width: 52 },
+    { label: "Test Steps", width: 58 }, { label: "Expected Result", width: 65 },
     { label: "Priority", width: 20 }
   ];
 
-  const drawReportHeader = () => {
-    doc.setTextColor(15, 23, 42);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(16);
+  const drawPageHeader = () => {
+    doc.setTextColor(15, 23, 42); doc.setFont("helvetica", "bold"); doc.setFontSize(16);
     doc.text(title, margin, margin);
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(9);
     doc.text(`Project Name: ${projectName}`, margin, margin + 7);
     doc.text(`Generated Date: ${generatedDate}`, margin, margin + 13);
     doc.text(`Total Records: ${testCases.length}`, pageWidth / 2, margin + 7);
-  };
-
-  const drawTableHeader = () => {
-    let x = margin;
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setLineWidth(0.2);
-
-    columns.forEach((column) => {
-      doc.setFillColor(241, 245, 249);
-      doc.setDrawColor(203, 213, 225);
-      doc.rect(x, tableTop - 9, column.width, 9, "FD");
-      doc.setTextColor(15, 23, 42);
-      doc.text(column.label, x + rowPadding, tableTop - 3.2);
-      x += column.width;
+    let x = margin; doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setLineWidth(0.2);
+    columns.forEach((col) => {
+      doc.setFillColor(241, 245, 249); doc.setDrawColor(203, 213, 225);
+      doc.rect(x, tableTop - 9, col.width, 9, "FD");
+      doc.setTextColor(15, 23, 42); doc.text(col.label, x + rowPadding, tableTop - 3.2);
+      x += col.width;
     });
-  };
-
-  const drawPageHeader = () => {
-    drawReportHeader();
-    drawTableHeader();
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8.5);
-    doc.setTextColor(30, 41, 59);
-    doc.setDrawColor(203, 213, 225);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8.5);
+    doc.setTextColor(30, 41, 59); doc.setDrawColor(203, 213, 225);
   };
 
   drawPageHeader();
-
-  let y = tableTop;
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
+  let y = tableTop; doc.setFont("helvetica", "normal"); doc.setFontSize(8.5);
 
   rows.forEach((row) => {
-    const wrappedCells = columns.map((column) =>
-      doc.splitTextToSize(String(row[column.label] || ""), column.width - rowPadding * 2)
-    );
-    const rowHeight = Math.max(...wrappedCells.map((cell) => cell.length)) * lineHeight + rowPadding * 2;
-
-    if (y + rowHeight > footerTop - 4) {
-      doc.addPage();
-      drawPageHeader();
-      y = tableTop;
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(8.5);
-    }
-
+    const wrapped = columns.map((col) => doc.splitTextToSize(String(row[col.label] || ""), col.width - rowPadding * 2));
+    const rowH = Math.max(...wrapped.map((c) => c.length)) * lineHeight + rowPadding * 2;
+    if (y + rowH > footerTop - 4) { doc.addPage(); drawPageHeader(); y = tableTop; doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); }
     let x = margin;
-    wrappedCells.forEach((cell, index) => {
-      doc.rect(x, y, columns[index].width, rowHeight);
-      doc.text(cell, x + rowPadding, y + rowPadding + 3.2);
-      x += columns[index].width;
-    });
-    y += rowHeight;
+    wrapped.forEach((cell, i) => { doc.rect(x, y, columns[i].width, rowH); doc.text(cell, x + rowPadding, y + rowPadding + 3.2); x += columns[i].width; });
+    y += rowH;
   });
 
-  const totalPages = doc.getNumberOfPages();
-  if (totalPages > 1) {
-    for (let pageNumber = 1; pageNumber <= totalPages; pageNumber += 1) {
-      doc.setPage(pageNumber);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(8);
-      doc.setTextColor(71, 85, 105);
-      doc.text(`Page ${pageNumber} of ${totalPages}`, pageWidth - margin, footerTop, { align: "right" });
+  const total = doc.getNumberOfPages();
+  if (total > 1) {
+    for (let p = 1; p <= total; p++) {
+      doc.setPage(p); doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(71, 85, 105);
+      doc.text(`Page ${p} of ${total}`, pageWidth - margin, footerTop, { align: "right" });
     }
   }
-
   doc.save(getExportFileName(testCases, "pdf", filePrefix));
 };
 
+/* ────────────────────────────────────────────────────────────────
+   SVG Icons
+──────────────────────────────────────────────────────────────── */
+const IconGenerate = () => (
+  <svg width="18" height="18" fill="none" viewBox="0 0 24 24">
+    <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"
+      stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+  </svg>
+);
+const IconSaved = () => (
+  <svg width="18" height="18" fill="none" viewBox="0 0 24 24">
+    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+    <polyline points="17 21 17 13 7 13 7 21" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+    <polyline points="7 3 7 8 15 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+const IconDashboard = () => (
+  <svg width="18" height="18" fill="none" viewBox="0 0 24 24">
+    <rect x="3" y="3" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.8"/>
+    <rect x="14" y="3" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.8"/>
+    <rect x="3" y="14" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.8"/>
+    <rect x="14" y="14" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.8"/>
+  </svg>
+);
+const IconLogout = () => (
+  <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+const IconSearch = () => (
+  <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
+    <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.8"/>
+    <path d="M21 21l-4.35-4.35" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+  </svg>
+);
+const IconExcel = () => (
+  <svg width="15" height="15" fill="none" viewBox="0 0 24 24">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="1.8"/>
+    <polyline points="14 2 14 8 20 8" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/>
+    <line x1="8" y1="13" x2="16" y2="13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+    <line x1="8" y1="17" x2="16" y2="17" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+  </svg>
+);
+const IconPdf = () => (
+  <svg width="15" height="15" fill="none" viewBox="0 0 24 24">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="1.8"/>
+    <polyline points="14 2 14 8 20 8" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/>
+    <path d="M9 13h1a2 2 0 0 1 0 4H9v-4zM15 13h2M15 17h2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+  </svg>
+);
+const IconEdit = () => (
+  <svg width="13" height="13" fill="none" viewBox="0 0 24 24">
+    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+const IconTrash = () => (
+  <svg width="13" height="13" fill="none" viewBox="0 0 24 24">
+    <polyline points="3 6 5 6 21 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+    <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+const IconSave = () => (
+  <svg width="13" height="13" fill="none" viewBox="0 0 24 24">
+    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+    <polyline points="17 21 17 13 7 13 7 21" stroke="currentColor" strokeWidth="1.8"/>
+    <polyline points="7 3 7 8 15 8" stroke="currentColor" strokeWidth="1.8"/>
+  </svg>
+);
+const IconCheck = () => (
+  <svg width="13" height="13" fill="none" viewBox="0 0 24 24">
+    <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+const IconX = () => (
+  <svg width="13" height="13" fill="none" viewBox="0 0 24 24">
+    <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+  </svg>
+);
+
+/* ────────────────────────────────────────────────────────────────
+   Empty State
+──────────────────────────────────────────────────────────────── */
+const EmptyState = ({ title, description, icon }) => (
+  <div className="flex flex-col items-center justify-center py-16 px-6 text-center animate-fade-in">
+    <div
+      className="w-16 h-16 rounded-2xl flex items-center justify-center mb-4"
+      style={{
+        background: "rgba(34,197,94,0.08)",
+        border: "1px solid rgba(34,197,94,0.15)"
+      }}
+    >
+      {icon}
+    </div>
+    <h3 className="text-base font-semibold text-slate-300 mb-1">{title}</h3>
+    <p className="text-sm text-slate-500 max-w-xs">{description}</p>
+  </div>
+);
+
+/* ────────────────────────────────────────────────────────────────
+   Test Cases Table
+──────────────────────────────────────────────────────────────── */
 const TestCasesTable = ({
-  testCases,
-  editingCase,
-  editingId,
-  onCancelEdit,
-  onDelete,
-  onEdit,
-  onSave,
-  onUpdateEdit,
-  onUpdateEditingCase,
-  selectable = false,
-  selectedIds = [],
-  onToggleSelected,
-  onToggleAll,
+  testCases, editingCase, editingId,
+  onCancelEdit, onDelete, onEdit, onSave, onUpdateEdit, onUpdateEditingCase,
+  selectable = false, selectedIds = [], onToggleSelected, onToggleAll,
   showSave = false
 }) => {
-  const allSelected = selectable && testCases.length > 0 && testCases.every((testCase) => selectedIds.includes(testCase.id));
+  const allSelected = selectable && testCases.length > 0 && testCases.every((tc) => selectedIds.includes(tc.id));
 
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-[1320px] table-fixed border-collapse text-left text-sm">
-        <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+      <table className="min-w-[1320px] table-fixed border-collapse text-left text-sm table-dark w-full">
+        <thead>
           <tr>
             {selectable && (
-              <th className="w-12 px-4 py-3 font-semibold">
+              <th className="w-12 px-5 py-4">
                 <input
-                  className="h-4 w-4 rounded border-slate-300 text-emerald-700 accent-emerald-700"
+                  className="h-4 w-4 rounded border-0 cursor-pointer"
+                  style={{ accentColor: "#22c55e" }}
                   checked={allSelected}
                   onChange={onToggleAll}
                   type="checkbox"
                 />
               </th>
             )}
-            <th className="w-36 px-5 py-4 font-semibold">Project Name</th>
-            <th className="w-36 px-5 py-4 font-semibold">Module Name</th>
-            <th className="w-28 px-4 py-3 font-semibold">Test Case ID</th>
-            <th className="w-64 px-5 py-4 font-semibold">Test Scenario</th>
-            <th className="w-72 px-5 py-4 font-semibold">Test Steps</th>
-            <th className="w-72 px-5 py-4 font-semibold">Expected Result</th>
-            <th className="w-28 px-4 py-3 font-semibold">Priority</th>
-            <th className="w-52 px-5 py-4 font-semibold">Actions</th>
+            <th className="w-36 px-5 py-4">Project</th>
+            <th className="w-36 px-5 py-4">Module</th>
+            <th className="w-28 px-5 py-4">ID</th>
+            <th className="w-64 px-5 py-4">Scenario</th>
+            <th className="w-72 px-5 py-4">Steps</th>
+            <th className="w-72 px-5 py-4">Expected Result</th>
+            <th className="w-24 px-5 py-4">Priority</th>
+            <th className="w-52 px-5 py-4">Actions</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-200">
-          {testCases.map((testCase) => {
-            const isEditing = editingId === testCase.id;
-
+        <tbody>
+          {testCases.map((tc) => {
+            const isEditing = editingId === tc.id;
             return (
-              <tr className="align-top transition hover:bg-slate-50" key={testCase.id}>
+              <tr key={tc.id} className="align-top transition-colors duration-150">
                 {selectable && (
-                  <td className="px-4 py-4">
+                  <td className="px-5 py-4">
                     <input
-                      className="h-4 w-4 rounded border-slate-300 text-emerald-700 accent-emerald-700"
-                      checked={selectedIds.includes(testCase.id)}
-                      onChange={() => onToggleSelected(testCase.id)}
+                      className="h-4 w-4 rounded cursor-pointer"
+                      style={{ accentColor: "#22c55e" }}
+                      checked={selectedIds.includes(tc.id)}
+                      onChange={() => onToggleSelected(tc.id)}
                       type="checkbox"
                     />
                   </td>
                 )}
-                <td className="px-5 py-5 text-slate-700">
+                <td className="px-5 py-4">
                   {isEditing ? (
-                    <input
-                      className="w-full rounded-md border border-slate-300 px-2 py-1 outline-none focus:border-emerald-600"
-                      name="projectName"
-                      onChange={onUpdateEditingCase}
-                      value={editingCase.projectName}
-                    />
+                    <input className="input-dark text-xs" name="projectName" onChange={onUpdateEditingCase} value={editingCase.projectName} />
                   ) : (
-                    testCase.projectName
+                    <span className="text-slate-300">{tc.projectName}</span>
                   )}
                 </td>
-                <td className="px-5 py-5 text-slate-700">
+                <td className="px-5 py-4">
                   {isEditing ? (
-                    <input
-                      className="w-full rounded-md border border-slate-300 px-2 py-1 outline-none focus:border-emerald-600"
-                      name="moduleName"
-                      onChange={onUpdateEditingCase}
-                      value={editingCase.moduleName}
-                    />
+                    <input className="input-dark text-xs" name="moduleName" onChange={onUpdateEditingCase} value={editingCase.moduleName} />
                   ) : (
-                    testCase.moduleName
+                    <span className="text-slate-300">{tc.moduleName}</span>
                   )}
                 </td>
-                <td className="px-4 py-4 font-semibold text-slate-900">{testCase.testCaseId}</td>
-                <td className="px-5 py-5 text-slate-700">
+                <td className="px-5 py-4">
+                  <span className="font-mono text-xs font-semibold text-green-400">{tc.testCaseId}</span>
+                </td>
+                <td className="px-5 py-4">
                   {isEditing ? (
-                    <textarea
-                      className="min-h-24 w-full rounded-md border border-slate-300 px-2 py-1 outline-none focus:border-emerald-600"
-                      name="testScenario"
-                      onChange={onUpdateEditingCase}
-                      value={editingCase.testScenario}
-                    />
+                    <textarea className="input-dark text-xs min-h-20" name="testScenario" onChange={onUpdateEditingCase} value={editingCase.testScenario} />
                   ) : (
-                    testCase.testScenario
+                    <span className="text-slate-300 text-xs leading-relaxed">{tc.testScenario}</span>
                   )}
                 </td>
-                <td className="px-5 py-5 text-slate-700">
+                <td className="px-5 py-4">
                   {isEditing ? (
-                    <textarea
-                      className="min-h-32 w-full rounded-md border border-slate-300 px-2 py-1 outline-none focus:border-emerald-600"
-                      name="testSteps"
-                      onChange={onUpdateEditingCase}
-                      value={editingCase.testSteps}
-                    />
+                    <textarea className="input-dark text-xs min-h-28" name="testSteps" onChange={onUpdateEditingCase} value={editingCase.testSteps} />
                   ) : (
-                    <ol className="list-decimal space-y-1 pl-4">
-                      {testCase.testSteps.map((step) => (
-                        <li key={step}>{step}</li>
-                      ))}
+                    <ol className="list-decimal pl-4 space-y-1 text-xs text-slate-400">
+                      {tc.testSteps.map((step, i) => <li key={i}>{step}</li>)}
                     </ol>
                   )}
                 </td>
-                <td className="px-5 py-5 text-slate-700">
+                <td className="px-5 py-4">
                   {isEditing ? (
-                    <textarea
-                      className="min-h-24 w-full rounded-md border border-slate-300 px-2 py-1 outline-none focus:border-emerald-600"
-                      name="expectedResult"
-                      onChange={onUpdateEditingCase}
-                      value={editingCase.expectedResult}
-                    />
+                    <textarea className="input-dark text-xs min-h-20" name="expectedResult" onChange={onUpdateEditingCase} value={editingCase.expectedResult} />
                   ) : (
-                    testCase.expectedResult
+                    <span className="text-slate-300 text-xs leading-relaxed">{tc.expectedResult}</span>
                   )}
                 </td>
-                <td className="px-4 py-5">
+                <td className="px-5 py-4">
                   {isEditing ? (
-                    <select
-                      className="w-full rounded-md border border-slate-300 px-2 py-1 text-slate-700 outline-none focus:border-emerald-600"
-                      name="priority"
-                      onChange={onUpdateEditingCase}
-                      value={editingCase.priority}
-                    >
-                      {priorities.map((priority) => (
-                        <option key={priority}>{priority}</option>
-                      ))}
+                    <select className="input-dark text-xs" name="priority" onChange={onUpdateEditingCase} value={editingCase.priority}>
+                      {priorities.map((p) => <option key={p}>{p}</option>)}
                     </select>
                   ) : (
-                    <span className={`rounded-full px-3 py-1 text-xs font-semibold ring-1 ${getPriorityBadgeClass(testCase.priority)}`}>
-                      {testCase.priority}
+                    <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${getPriorityStyle(tc.priority)}`}>
+                      {tc.priority}
                     </span>
                   )}
                 </td>
-                <td className="px-5 py-5">
+                <td className="px-5 py-4">
                   {isEditing ? (
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex gap-2 flex-wrap">
                       <button
-                        className="rounded-md bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-800"
-                        onClick={onUpdateEdit}
-                        type="button"
+                        className="inline-flex items-center gap-1.5 btn-primary px-3 py-1.5 text-xs"
+                        onClick={onUpdateEdit} type="button"
                       >
-                        Save edit
+                        <IconCheck /> Save
                       </button>
                       <button
-                        className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                        onClick={onCancelEdit}
-                        type="button"
+                        className="inline-flex items-center gap-1.5 btn-ghost px-3 py-1.5 text-xs"
+                        onClick={onCancelEdit} type="button"
                       >
-                        Cancel
+                        <IconX /> Cancel
                       </button>
                     </div>
                   ) : (
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex gap-2 flex-wrap">
                       {showSave && (
                         <button
-                          className="rounded-md bg-emerald-700 px-3 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-emerald-800 disabled:bg-slate-400"
-                          disabled={testCase.saved}
-                          onClick={() => onSave(testCase)}
+                          className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium transition-all duration-200"
+                          style={tc.saved ? {
+                            background: "rgba(34,197,94,0.08)", color: "#4ade80",
+                            border: "1px solid rgba(34,197,94,0.15)", cursor: "default"
+                          } : {
+                            background: "rgba(34,197,94,0.12)", color: "#4ade80",
+                            border: "1px solid rgba(34,197,94,0.2)"
+                          }}
+                          disabled={tc.saved}
+                          onClick={() => onSave(tc)}
                           type="button"
                         >
-                          {testCase.saved ? "Saved" : "Save"}
+                          {tc.saved ? <><IconCheck /> Saved</> : <><IconSave /> Save</>}
                         </button>
                       )}
                       <button
-                        className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-100"
-                        onClick={() => onEdit(testCase)}
-                        type="button"
+                        className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium transition-all duration-200"
+                        style={{ background: "rgba(148,163,184,0.08)", color: "#94a3b8", border: "1px solid rgba(148,163,184,0.15)" }}
+                        onClick={() => onEdit(tc)} type="button"
                       >
-                        Edit
+                        <IconEdit /> Edit
                       </button>
-                      <button
-                        className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50"
-                        onClick={() => onDelete(testCase)}
-                        type="button"
-                      >
-                        Delete
+                      <button className="btn-danger inline-flex items-center gap-1.5" onClick={() => onDelete(tc)} type="button">
+                        <IconTrash /> Delete
                       </button>
                     </div>
                   )}
@@ -445,6 +390,62 @@ const TestCasesTable = ({
   );
 };
 
+/* ────────────────────────────────────────────────────────────────
+   Stat Card
+──────────────────────────────────────────────────────────────── */
+const StatCard = ({ label, value, description, glowColor, icon }) => (
+  <div
+    className="stat-card animate-fade-in"
+    style={{ "--glow": glowColor }}
+  >
+    <div
+      className="absolute top-0 right-0 w-24 h-24 rounded-full"
+      style={{ background: glowColor, filter: "blur(40px)", opacity: 0.2 }}
+    />
+    <div
+      className="inline-flex items-center justify-center w-11 h-11 rounded-xl mb-4"
+      style={{ background: `${glowColor}20`, border: `1px solid ${glowColor}30` }}
+    >
+      {icon}
+    </div>
+    <p className="text-sm text-slate-500 font-medium">{label}</p>
+    <p className="text-4xl font-bold text-white mt-2 font-display">{value}</p>
+    <p className="text-xs text-slate-600 mt-3 leading-relaxed">{description}</p>
+  </div>
+);
+
+/* ────────────────────────────────────────────────────────────────
+   Export Button
+──────────────────────────────────────────────────────────────── */
+const ExportBtn = ({ icon, label, onClick, disabled, accent = "slate" }) => {
+  const accents = {
+    green: { bg: "rgba(34,197,94,0.08)", color: "#4ade80", border: "rgba(34,197,94,0.2)", hoverBg: "rgba(34,197,94,0.15)" },
+    sky:   { bg: "rgba(56,189,248,0.08)", color: "#38bdf8", border: "rgba(56,189,248,0.2)", hoverBg: "rgba(56,189,248,0.15)" },
+    slate: { bg: "rgba(148,163,184,0.06)", color: "#94a3b8", border: "rgba(148,163,184,0.15)", hoverBg: "rgba(148,163,184,0.1)" }
+  };
+  const a = accents[accent];
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200"
+      style={{
+        background: a.bg, color: disabled ? "#475569" : a.color,
+        border: `1px solid ${disabled ? "rgba(71,85,105,0.2)" : a.border}`,
+        cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.5 : 1
+      }}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+};
+
+/* ────────────────────────────────────────────────────────────────
+   Main Dashboard
+──────────────────────────────────────────────────────────────── */
 const Dashboard = ({ user, onLogout }) => {
   const [activeView, setActiveView] = useState("generate");
   const [form, setForm] = useState(initialForm);
@@ -459,619 +460,555 @@ const Dashboard = ({ user, onLogout }) => {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const loadSavedTestCases = async () => {
-      try {
-        const { data } = await api.get("/tests");
-        setSavedTestCases(data.tests);
-      } catch (requestError) {
-        setError(requestError.response?.data?.message || "Could not load saved test cases");
-      }
-    };
-
-    loadSavedTestCases();
+    api.get("/tests")
+      .then(({ data }) => setSavedTestCases(data.tests))
+      .catch((e) => setError(e.response?.data?.message || "Could not load saved test cases"));
   }, []);
 
-  const savedSummary = useMemo(
-    () => ({
-      total: savedTestCases.length,
-      High: savedTestCases.filter((testCase) => testCase.priority === "High").length,
-      Medium: savedTestCases.filter((testCase) => testCase.priority === "Medium").length,
-      Low: savedTestCases.filter((testCase) => testCase.priority === "Low").length
-    }),
-    [savedTestCases]
-  );
+  const savedSummary = useMemo(() => ({
+    total: savedTestCases.length,
+    High:   savedTestCases.filter((tc) => tc.priority === "High").length,
+    Medium: savedTestCases.filter((tc) => tc.priority === "Medium").length,
+    Low:    savedTestCases.filter((tc) => tc.priority === "Low").length
+  }), [savedTestCases]);
 
   const moduleOptions = useMemo(
-    () => [...new Set(savedTestCases.map((testCase) => testCase.moduleName).filter(Boolean))].sort(),
+    () => [...new Set(savedTestCases.map((tc) => tc.moduleName).filter(Boolean))].sort(),
     [savedTestCases]
   );
 
   const filteredSavedTestCases = useMemo(() => {
-    const query = filters.search.trim().toLowerCase();
-
-    return savedTestCases.filter((testCase) => {
-      const matchesSearch =
-        !query ||
-        testCase.projectName.toLowerCase().includes(query) ||
-        testCase.moduleName.toLowerCase().includes(query) ||
-        testCase.testScenario.toLowerCase().includes(query);
-      const matchesPriority = !filters.priority || testCase.priority === filters.priority;
-      const matchesModule = !filters.moduleName || testCase.moduleName === filters.moduleName;
-
-      return matchesSearch && matchesPriority && matchesModule;
-    });
+    const q = filters.search.trim().toLowerCase();
+    return savedTestCases.filter((tc) =>
+      (!q || tc.projectName.toLowerCase().includes(q) || tc.moduleName.toLowerCase().includes(q) || tc.testScenario.toLowerCase().includes(q)) &&
+      (!filters.priority || tc.priority === filters.priority) &&
+      (!filters.moduleName || tc.moduleName === filters.moduleName)
+    );
   }, [filters, savedTestCases]);
 
   const selectedSavedTestCases = useMemo(
-    () => savedTestCases.filter((testCase) => selectedSavedIds.includes(testCase.id)),
+    () => savedTestCases.filter((tc) => selectedSavedIds.includes(tc.id)),
     [savedTestCases, selectedSavedIds]
   );
 
-  const updateForm = (event) => {
-    const { name, value } = event.target;
-    setForm((currentForm) => ({ ...currentForm, [name]: value }));
+  const updateForm = (e) => {
+    const { name, value } = e.target;
+    setForm((f) => ({ ...f, [name]: value }));
   };
 
-  const updateFilters = (event) => {
-    const { name, value } = event.target;
-    setFilters((currentFilters) => ({ ...currentFilters, [name]: value }));
+  const updateFilters = (e) => {
+    const { name, value } = e.target;
+    setFilters((f) => ({ ...f, [name]: value }));
   };
 
-  const clearFilters = () => {
-    setFilters(initialFilters);
-    setSelectedSavedIds([]);
-  };
+  const clearFilters = () => { setFilters(initialFilters); setSelectedSavedIds([]); };
 
-  const handleGenerate = async (event) => {
-    event.preventDefault();
-    setIsGenerating(true);
-    setError("");
-    setMessage("");
-    setEditingId("");
-    setEditingCase(null);
-
+  const handleGenerate = async (e) => {
+    e.preventDefault();
+    setIsGenerating(true); setError(""); setMessage(""); setEditingId(""); setEditingCase(null);
     try {
       const { data } = await api.post("/tests/generate", form);
       setGeneratedTestCases(data.testCases);
       setActiveView("generate");
-      setMessage(`${data.testCases.length} test cases generated.`);
-    } catch (requestError) {
-      setError(requestError.response?.data?.message || "Could not generate test cases");
+      setMessage(`✓ ${data.testCases.length} test cases generated.`);
+    } catch (err) {
+      setError(err.response?.data?.message || "Could not generate test cases");
     } finally {
       setIsGenerating(false);
     }
   };
 
-  const handleSave = async (testCase) => {
-    setError("");
-    setMessage("");
-
+  const handleSave = async (tc) => {
+    setError(""); setMessage("");
     try {
-      const { data } = await api.post("/tests", { testCase });
-      setGeneratedTestCases((currentCases) =>
-        currentCases.map((item) => (item.id === testCase.id ? data.testCase : item))
-      );
-      setSavedTestCases((currentCases) => {
-        const exists = currentCases.some((item) => item.id === data.testCase.id);
-        return exists
-          ? currentCases.map((item) => (item.id === data.testCase.id ? data.testCase : item))
-          : [...currentCases, data.testCase];
+      const { data } = await api.post("/tests", { testCase: tc });
+      setGeneratedTestCases((cur) => cur.map((item) => item.id === tc.id ? data.testCase : item));
+      setSavedTestCases((cur) => {
+        const exists = cur.some((item) => item.id === data.testCase.id);
+        return exists ? cur.map((item) => item.id === data.testCase.id ? data.testCase : item) : [...cur, data.testCase];
       });
-      setMessage(`${data.testCase.testCaseId} saved.`);
-    } catch (requestError) {
-      setError(requestError.response?.data?.message || "Could not save test case");
+      setMessage(`✓ ${data.testCase.testCaseId} saved.`);
+    } catch (err) {
+      setError(err.response?.data?.message || "Could not save test case");
     }
   };
 
-  const startEditing = (testCase) => {
-    setEditingId(testCase.id);
-    setEditingCase({
-      ...testCase,
-      testSteps: testCase.testSteps.join("\n")
-    });
-    setError("");
-    setMessage("");
+  const startEditing = (tc) => {
+    setEditingId(tc.id);
+    setEditingCase({ ...tc, testSteps: tc.testSteps.join("\n") });
+    setError(""); setMessage("");
   };
 
-  const updateEditingCase = (event) => {
-    const { name, value } = event.target;
-    setEditingCase((currentCase) => ({ ...currentCase, [name]: value }));
+  const updateEditingCase = (e) => {
+    const { name, value } = e.target;
+    setEditingCase((cur) => ({ ...cur, [name]: value }));
   };
 
-  const cancelEditing = () => {
-    setEditingId("");
-    setEditingCase(null);
-  };
+  const cancelEditing = () => { setEditingId(""); setEditingCase(null); };
 
-  const updateCaseInState = (updatedCase) => {
-    setGeneratedTestCases((currentCases) =>
-      currentCases.map((item) => (item.id === updatedCase.id ? updatedCase : item))
-    );
-    setSavedTestCases((currentCases) =>
-      currentCases.map((item) => (item.id === updatedCase.id ? updatedCase : item))
-    );
+  const updateCaseInState = (updated) => {
+    setGeneratedTestCases((cur) => cur.map((item) => item.id === updated.id ? updated : item));
+    setSavedTestCases((cur) => cur.map((item) => item.id === updated.id ? updated : item));
   };
 
   const handleUpdate = async () => {
-    setError("");
-    setMessage("");
-
-    const payload = {
-      ...editingCase,
-      testSteps: editingCase.testSteps
-        .split("\n")
-        .map((step) => step.trim())
-        .filter(Boolean)
-    };
-
+    setError(""); setMessage("");
+    const payload = { ...editingCase, testSteps: editingCase.testSteps.split("\n").map((s) => s.trim()).filter(Boolean) };
     try {
       const endpoint = editingCase.saved ? `/tests/${editingCase.id}` : "/tests";
       const body = editingCase.saved ? payload : { testCase: payload };
       const { data } = editingCase.saved ? await api.put(endpoint, body) : await api.post(endpoint, body);
-
       if (editingCase.saved) {
         updateCaseInState(data.testCase);
       } else {
-        setGeneratedTestCases((currentCases) =>
-          currentCases.map((item) => (item.id === editingCase.id ? data.testCase : item))
-        );
-        setSavedTestCases((currentCases) => [...currentCases, data.testCase]);
+        setGeneratedTestCases((cur) => cur.map((item) => item.id === editingCase.id ? data.testCase : item));
+        setSavedTestCases((cur) => [...cur, data.testCase]);
       }
-
-      setMessage(`${data.testCase.testCaseId} updated.`);
+      setMessage(`✓ ${data.testCase.testCaseId} updated.`);
       cancelEditing();
-    } catch (requestError) {
-      setError(requestError.response?.data?.message || "Could not update test case");
+    } catch (err) {
+      setError(err.response?.data?.message || "Could not update test case");
     }
   };
 
-  const handleDelete = async (testCase) => {
-    setError("");
-    setMessage("");
-
-    if (!testCase.saved) {
-      setGeneratedTestCases((currentCases) => currentCases.filter((item) => item.id !== testCase.id));
-      setMessage(`${testCase.testCaseId} removed.`);
+  const handleDelete = async (tc) => {
+    setError(""); setMessage("");
+    if (!tc.saved) {
+      setGeneratedTestCases((cur) => cur.filter((item) => item.id !== tc.id));
+      setMessage(`✓ ${tc.testCaseId} removed.`);
       return;
     }
-
     try {
-      await api.delete(`/tests/${testCase.id}`);
-      setSavedTestCases((currentCases) => currentCases.filter((item) => item.id !== testCase.id));
-      setGeneratedTestCases((currentCases) => currentCases.filter((item) => item.id !== testCase.id));
-      setSelectedSavedIds((currentIds) => currentIds.filter((id) => id !== testCase.id));
-      setMessage(`${testCase.testCaseId} deleted.`);
-    } catch (requestError) {
-      setError(requestError.response?.data?.message || "Could not delete test case");
+      await api.delete(`/tests/${tc.id}`);
+      setSavedTestCases((cur) => cur.filter((item) => item.id !== tc.id));
+      setGeneratedTestCases((cur) => cur.filter((item) => item.id !== tc.id));
+      setSelectedSavedIds((cur) => cur.filter((id) => id !== tc.id));
+      setMessage(`✓ ${tc.testCaseId} deleted.`);
+    } catch (err) {
+      setError(err.response?.data?.message || "Could not delete test case");
     }
   };
 
-  const exportExcel = (testCases, filePrefix, emptyMessage) => {
-    if (testCases.length === 0) {
-      setError(emptyMessage);
-      setMessage("");
-      return;
-    }
-
-    createExcelExport(testCases, filePrefix);
-    setMessage("Excel export downloaded.");
-    setError("");
+  const exportExcel = (cases, prefix, emptyMsg) => {
+    if (!cases.length) { setError(emptyMsg); setMessage(""); return; }
+    createExcelExport(cases, prefix); setMessage("✓ Excel exported."); setError("");
   };
 
-  const exportPdf = (testCases, filePrefix, title, emptyMessage) => {
-    if (testCases.length === 0) {
-      setError(emptyMessage);
-      setMessage("");
-      return;
-    }
-
-    createPdfExport(testCases, filePrefix, title);
-    setMessage("PDF export downloaded.");
-    setError("");
+  const exportPdf = (cases, prefix, title, emptyMsg) => {
+    if (!cases.length) { setError(emptyMsg); setMessage(""); return; }
+    createPdfExport(cases, prefix, title); setMessage("✓ PDF exported."); setError("");
   };
 
   const toggleSavedSelection = (id) => {
-    setSelectedSavedIds((currentIds) =>
-      currentIds.includes(id) ? currentIds.filter((currentId) => currentId !== id) : [...currentIds, id]
-    );
+    setSelectedSavedIds((cur) => cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]);
   };
 
   const toggleAllVisibleSaved = () => {
-    const visibleIds = filteredSavedTestCases.map((testCase) => testCase.id);
-    const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedSavedIds.includes(id));
-
-    setSelectedSavedIds((currentIds) =>
-      allVisibleSelected
-        ? currentIds.filter((id) => !visibleIds.includes(id))
-        : [...new Set([...currentIds, ...visibleIds])]
-    );
+    const visible = filteredSavedTestCases.map((tc) => tc.id);
+    const allSel = visible.length > 0 && visible.every((id) => selectedSavedIds.includes(id));
+    setSelectedSavedIds((cur) => allSel ? cur.filter((id) => !visible.includes(id)) : [...new Set([...cur, ...visible])]);
   };
 
-  const navigationItems = [
-    { id: "generate", label: "Generate Test Cases" },
-    { id: "saved", label: "Saved Test Cases" },
-    { id: "dashboard", label: "Dashboard" }
+  /* ── Nav items ── */
+  const navItems = [
+    { id: "generate",  label: "Generate",     icon: <IconGenerate /> },
+    { id: "saved",     label: "Saved Cases",  icon: <IconSaved /> },
+    { id: "dashboard", label: "Dashboard",    icon: <IconDashboard /> }
   ];
 
-  const pageDetails = {
-    generate: {
-      title: "Generate Test Cases",
-      helper: "Start here. Describe a feature and create structured QA test cases in seconds."
-    },
-    saved: {
-      title: "Saved Test Cases",
-      helper: "Search, filter, edit, delete, and export selected saved test cases."
-    },
-    dashboard: {
-      title: "Dashboard",
-      helper: "Review saved test case totals and priority distribution."
-    }
+  const pageMeta = {
+    generate:  { title: "Generate Test Cases",  sub: "Describe a feature and create structured QA test cases instantly with AI." },
+    saved:     { title: "Saved Test Cases",     sub: "Search, filter, edit and export your saved QA library." },
+    dashboard: { title: "Analytics Dashboard",  sub: "Review your test case totals and priority distribution at a glance." }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
-      <aside className="fixed left-0 top-0 z-30 flex h-screen w-[260px] flex-col border-r border-slate-200 bg-white p-6">
-        <div className="flex items-center gap-3 rounded-2xl border border-emerald-100 bg-emerald-50/70 p-3">
-          <img
-            alt="TestMate AI logo"
-            className="h-14 w-14 shrink-0 rounded-xl object-contain shadow-sm"
-            src={testmateLogo}
-          />
-          <div className="min-w-0">
-            <p className="text-lg font-extrabold leading-6 tracking-tight text-slate-950">TestMate AI</p>
-            <p className="text-xs font-medium leading-5 text-slate-500">QA Test Case Generator</p>
+    <div className="min-h-screen" style={{ background: "#0a0f1e" }}>
+      {/* Background mesh */}
+      <div className="fixed inset-0 pointer-events-none" style={{
+        background: "radial-gradient(ellipse at 20% 20%, rgba(34,197,94,0.06) 0%, transparent 60%), radial-gradient(ellipse at 80% 80%, rgba(20,184,166,0.05) 0%, transparent 60%)"
+      }} />
+
+      {/* ── Sidebar ── */}
+      <aside
+        className="fixed left-0 top-0 z-30 flex h-screen w-[240px] flex-col py-6 px-4"
+        style={{
+          background: "rgba(10,15,30,0.95)",
+          borderRight: "1px solid rgba(255,255,255,0.06)",
+          backdropFilter: "blur(20px)"
+        }}
+      >
+        {/* Logo */}
+        <div className="flex items-center gap-3 px-2 mb-8">
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+            style={{
+              background: "linear-gradient(135deg, rgba(22,163,74,0.3) 0%, rgba(20,184,166,0.2) 100%)",
+              border: "1px solid rgba(34,197,94,0.3)",
+              boxShadow: "0 0 20px rgba(34,197,94,0.15)"
+            }}
+          >
+            <img src={testmateLogo} alt="TestMate AI" className="w-7 h-7 rounded-lg object-contain" />
+          </div>
+          <div>
+            <p className="font-display font-bold text-base text-white leading-tight">TestMate AI</p>
+            <p className="text-xs text-slate-600">QA Generator</p>
           </div>
         </div>
 
-        <nav className="mt-8 flex flex-col gap-2">
-          {navigationItems.map((item) => (
+        {/* Navigation */}
+        <nav className="flex flex-col gap-1 flex-1">
+          {navItems.map((item) => (
             <button
-              className={`rounded-xl px-4 py-3 text-left text-sm font-semibold transition ${
-                activeView === item.id
-                  ? "bg-emerald-700 text-white shadow-sm"
-                  : "text-slate-600 hover:bg-emerald-50 hover:text-emerald-800"
-              }`}
               key={item.id}
+              className={`nav-item ${activeView === item.id ? "active" : ""}`}
               onClick={() => setActiveView(item.id)}
               type="button"
             >
+              {item.icon}
               {item.label}
+              {item.id === "saved" && savedTestCases.length > 0 && (
+                <span
+                  className="ml-auto text-xs font-bold px-2 py-0.5 rounded-full"
+                  style={{ background: "rgba(34,197,94,0.15)", color: "#4ade80" }}
+                >
+                  {savedTestCases.length}
+                </span>
+              )}
             </button>
           ))}
         </nav>
 
-        <button
-          className="mt-auto rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-          onClick={onLogout}
-          type="button"
+        {/* User + logout */}
+        <div
+          className="rounded-xl p-3 mt-4"
+          style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}
         >
-          Logout
-        </button>
+          <div className="flex items-center gap-3">
+            <div
+              className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+              style={{ background: "linear-gradient(135deg, #16a34a, #0d9488)", color: "white" }}
+            >
+              {user.name?.[0]?.toUpperCase() || "U"}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-slate-200 truncate">{user.name}</p>
+              <p className="text-xs text-slate-500 truncate">{user.email}</p>
+            </div>
+          </div>
+          <button
+            className="mt-3 flex items-center gap-2 w-full text-xs text-slate-500 hover:text-red-400 transition-colors duration-200 px-1"
+            onClick={onLogout}
+            type="button"
+          >
+            <IconLogout /> Sign out
+          </button>
+        </div>
       </aside>
 
-      <main className="ml-[260px] min-h-screen bg-slate-50">
+      {/* ── Main ── */}
+      <main className="ml-[240px] min-h-screen relative z-10">
         <div className="mx-auto max-w-[1200px] p-8">
-          <header className="mb-8 rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+
+          {/* Header */}
+          <header className="mb-8 animate-fade-in">
+            <div className="flex items-start justify-between gap-4">
               <div>
-                <h1 className="text-2xl font-bold text-slate-950">{pageDetails[activeView].title}</h1>
-                <p className="mt-1 max-w-2xl text-sm text-slate-600">{pageDetails[activeView].helper}</p>
+                <h1 className="font-display text-2xl font-bold text-white">{pageMeta[activeView].title}</h1>
+                <p className="mt-1 text-sm text-slate-500">{pageMeta[activeView].sub}</p>
               </div>
-              <div className="inline-flex w-fit rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700">
-                {user.name}
+              <div
+                className="px-3 py-1.5 rounded-lg text-sm text-slate-400 shrink-0"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}
+              >
+                👋 {user.name}
               </div>
             </div>
           </header>
 
+          {/* Toast notifications */}
           {(error || message) && (
-            <div className="mb-6 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-              {error && <p className="text-sm font-medium text-red-600">{error}</p>}
-              {message && <p className="text-sm font-medium text-emerald-700">{message}</p>}
+            <div className="mb-6 animate-slide-up">
+              {error   && <div className="toast-error mb-2">{error}</div>}
+              {message && <div className="toast-success">{message}</div>}
             </div>
           )}
 
+          {/* ══════════ GENERATE VIEW ══════════ */}
           {activeView === "generate" && (
-            <div className="animate-fade-in space-y-6">
-              <section className="flex items-center justify-between gap-6 overflow-hidden rounded-xl border border-emerald-100 bg-gradient-to-br from-emerald-50 via-teal-50 to-sky-50 p-6 shadow-sm transition hover:shadow-md">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Start here</p>
-                  <h2 className="mt-2 text-xl font-bold text-slate-950">Generate QA Test Cases</h2>
-                  <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-                    Describe a feature and generate structured QA test cases instantly.
-                  </p>
+            <div className="space-y-6 animate-fade-in">
+              {/* Hero banner */}
+              <div
+                className="rounded-2xl p-6 relative overflow-hidden"
+                style={{
+                  background: "linear-gradient(135deg, rgba(22,163,74,0.12) 0%, rgba(20,184,166,0.08) 50%, rgba(6,182,212,0.06) 100%)",
+                  border: "1px solid rgba(34,197,94,0.2)"
+                }}
+              >
+                <div className="absolute top-0 right-0 w-48 h-48 rounded-full" style={{ background: "rgba(34,197,94,0.08)", filter: "blur(40px)" }} />
+                <div className="relative">
+                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-green-400 uppercase tracking-wider mb-3">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                    AI-Powered
+                  </span>
+                  <h2 className="font-display text-xl font-bold text-white">Generate QA Test Cases</h2>
+                  <p className="mt-1 text-sm text-slate-400 max-w-lg">Describe any feature and our AI will generate comprehensive, structured test cases in seconds.</p>
                 </div>
-                <div className="hidden md:block">
-                  <GeneratorIllustration />
-                </div>
-              </section>
+              </div>
 
+              {/* Generator Form */}
               <form
-                className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md"
+                className="rounded-2xl p-6"
+                style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}
                 onSubmit={handleGenerate}
               >
+                <h3 className="text-base font-semibold text-slate-200 mb-5">Feature Details</h3>
                 <div className="grid gap-5 md:grid-cols-2">
                   <label className="space-y-2">
-                    <span className="text-sm font-medium text-slate-700">Project Name</span>
+                    <span className="text-sm font-medium text-slate-400">Project Name</span>
                     <input
-                      className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
-                      name="projectName"
-                      onChange={updateForm}
-                      placeholder="Example: Online Banking App"
-                      required
-                      type="text"
-                      value={form.projectName}
+                      className="input-dark"
+                      name="projectName" onChange={updateForm}
+                      placeholder="e.g. Online Banking App"
+                      required type="text" value={form.projectName}
                     />
                   </label>
-
                   <label className="space-y-2">
-                    <span className="text-sm font-medium text-slate-700">Module Name</span>
+                    <span className="text-sm font-medium text-slate-400">Module Name</span>
                     <input
-                      className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
-                      name="moduleName"
-                      onChange={updateForm}
-                      placeholder="Example: Authentication"
-                      required
-                      type="text"
-                      value={form.moduleName}
+                      className="input-dark"
+                      name="moduleName" onChange={updateForm}
+                      placeholder="e.g. Authentication"
+                      required type="text" value={form.moduleName}
                     />
                   </label>
-
                   <label className="space-y-2 md:col-span-2">
-                    <span className="text-sm font-medium text-slate-700">Feature Description</span>
+                    <span className="text-sm font-medium text-slate-400">Feature Description</span>
                     <textarea
-                      className="min-h-32 w-full resize-y rounded-xl border border-slate-300 px-3 py-2.5 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
-                      name="featureDescription"
-                      onChange={updateForm}
-                      placeholder="Example: Login flow for users with valid and invalid credentials"
-                      required
-                      value={form.featureDescription}
+                      className="input-dark min-h-32 resize-y"
+                      name="featureDescription" onChange={updateForm}
+                      placeholder="e.g. Login flow for users with valid and invalid credentials, including 2FA..."
+                      required value={form.featureDescription}
                     />
                   </label>
-
-                  <div className="grid gap-4 md:col-span-2 md:grid-cols-[220px_auto] md:items-end">
+                  <div className="md:col-span-2 flex flex-wrap items-end gap-4">
                     <label className="space-y-2">
-                      <span className="text-sm font-medium text-slate-700">Number of test cases</span>
+                      <span className="text-sm font-medium text-slate-400">Number of test cases</span>
                       <input
-                        className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-slate-950 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
-                        max="50"
-                        min="1"
-                        name="numberOfTestCases"
-                        onChange={updateForm}
-                        required
-                        type="number"
+                        className="input-dark w-44"
+                        max="50" min="1" name="numberOfTestCases"
+                        onChange={updateForm} required type="number"
                         value={form.numberOfTestCases}
                       />
                     </label>
-
-                    <button
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-700 px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-slate-400 md:w-fit"
-                      disabled={isGenerating}
-                      type="submit"
-                    >
-                      {isGenerating && (
-                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                    <button className="btn-primary flex items-center gap-2" disabled={isGenerating} type="submit">
+                      {isGenerating ? (
+                        <><span className="spinner" /> Generating...</>
+                      ) : (
+                        <>
+                          <svg width="16" height="16" fill="none" viewBox="0 0 24 24">
+                            <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                          Generate Test Cases
+                        </>
                       )}
-                      {isGenerating ? "Generating..." : "Generate test cases"}
                     </button>
                   </div>
                 </div>
               </form>
 
-              <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md">
-                <div className="flex flex-col gap-3 border-b border-slate-200 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+              {/* Results */}
+              <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                <div
+                  className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-6 py-5"
+                  style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}
+                >
                   <div>
-                    <h2 className="text-lg font-semibold text-slate-950">Generated test cases</h2>
+                    <h3 className="text-base font-semibold text-slate-200">Generated Test Cases</h3>
                     <p className="text-sm text-slate-500">{generatedTestCases.length} total</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <button
-                      className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 disabled:hover:bg-white"
-                      disabled={generatedTestCases.length === 0}
-                      onClick={() =>
-                        exportExcel(generatedTestCases, "generated-test-cases", "No generated test cases to export")
-                      }
-                      type="button"
-                    >
-                      Export to Excel
-                    </button>
-                    <button
-                      className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-800 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400 disabled:hover:bg-white"
-                      disabled={generatedTestCases.length === 0}
-                      onClick={() =>
-                        exportPdf(
-                          generatedTestCases,
-                          "generated-test-cases",
-                          "Generated Test Cases",
-                          "No generated test cases to export"
-                        )
-                      }
-                      type="button"
-                    >
-                      Export to PDF
-                    </button>
+                    <ExportBtn icon={<IconExcel />} label="Export Excel" accent="green"
+                      disabled={!generatedTestCases.length}
+                      onClick={() => exportExcel(generatedTestCases, "generated-test-cases", "No generated test cases to export")} />
+                    <ExportBtn icon={<IconPdf />} label="Export PDF" accent="sky"
+                      disabled={!generatedTestCases.length}
+                      onClick={() => exportPdf(generatedTestCases, "generated-test-cases", "Generated Test Cases", "No generated test cases to export")} />
                   </div>
                 </div>
-
                 {generatedTestCases.length === 0 ? (
-                  <div className="px-6 py-12 text-center">
-                    <EmptyStateIllustration />
-                    <h3 className="mt-4 text-sm font-semibold text-slate-900">No generated test cases yet</h3>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Fill in the form above and click Generate test cases.
-                    </p>
-                  </div>
+                  <EmptyState
+                    title="No test cases yet"
+                    description="Fill in the form above and click Generate to create AI-powered test cases."
+                    icon={<svg width="24" height="24" fill="none" viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="#4ade80" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                  />
                 ) : (
                   <TestCasesTable
-                    editingCase={editingCase}
-                    editingId={editingId}
-                    onCancelEdit={cancelEditing}
-                    onDelete={handleDelete}
-                    onEdit={startEditing}
-                    onSave={handleSave}
-                    onUpdateEdit={handleUpdate}
-                    onUpdateEditingCase={updateEditingCase}
-                    showSave
-                    testCases={generatedTestCases}
+                    editingCase={editingCase} editingId={editingId}
+                    onCancelEdit={cancelEditing} onDelete={handleDelete}
+                    onEdit={startEditing} onSave={handleSave}
+                    onUpdateEdit={handleUpdate} onUpdateEditingCase={updateEditingCase}
+                    showSave testCases={generatedTestCases}
                   />
                 )}
-              </section>
+              </div>
             </div>
           )}
 
+          {/* ══════════ SAVED VIEW ══════════ */}
           {activeView === "saved" && (
-            <div className="animate-fade-in space-y-6">
-              <section className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition hover:shadow-md">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="space-y-6 animate-fade-in">
+              {/* Filters */}
+              <div className="rounded-2xl p-6" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between mb-5">
                   <div>
-                    <h2 className="text-lg font-semibold text-slate-950">Search and filters</h2>
-                    <p className="mt-1 text-sm text-slate-500">Filter saved cases, select rows, then export.</p>
+                    <h3 className="text-base font-semibold text-slate-200">Filters & Export</h3>
+                    <p className="text-sm text-slate-500 mt-0.5">Filter saved cases, select rows, then export.</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <button
-                      className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2.5 text-sm font-semibold text-emerald-800 shadow-sm transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-white disabled:text-slate-400"
-                      disabled={selectedSavedTestCases.length === 0}
-                      onClick={() =>
-                        exportExcel(selectedSavedTestCases, "saved-test-cases", "Select saved test cases to export")
-                      }
-                      type="button"
-                    >
-                      Export selected to Excel
-                    </button>
-                    <button
-                      className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-2.5 text-sm font-semibold text-sky-800 shadow-sm transition hover:bg-sky-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-white disabled:text-slate-400"
-                      disabled={selectedSavedTestCases.length === 0}
-                      onClick={() =>
-                        exportPdf(
-                          selectedSavedTestCases,
-                          "saved-test-cases",
-                          "Saved Test Cases Report",
-                          "Select saved test cases to export"
-                        )
-                      }
-                      type="button"
-                    >
-                      Export selected to PDF
-                    </button>
+                    <ExportBtn icon={<IconExcel />} label="Export Selected (Excel)" accent="green"
+                      disabled={!selectedSavedTestCases.length}
+                      onClick={() => exportExcel(selectedSavedTestCases, "saved-test-cases", "Select saved test cases to export")} />
+                    <ExportBtn icon={<IconPdf />} label="Export Selected (PDF)" accent="sky"
+                      disabled={!selectedSavedTestCases.length}
+                      onClick={() => exportPdf(selectedSavedTestCases, "saved-test-cases", "Saved Test Cases Report", "Select saved test cases to export")} />
                   </div>
                 </div>
-
-                <div className="mt-5 grid gap-4 lg:grid-cols-[1.5fr_1fr_1fr_auto]">
-                  <input
-                    className="rounded-xl border border-slate-300 px-3 py-2.5 text-slate-950 outline-none transition placeholder:text-slate-400 focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
-                    name="search"
-                    onChange={updateFilters}
-                    placeholder="Search project, module, or scenario"
-                    type="search"
-                    value={filters.search}
-                  />
-                  <select
-                    className="rounded-xl border border-slate-300 px-3 py-2.5 text-slate-700 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
-                    name="priority"
-                    onChange={updateFilters}
-                    value={filters.priority}
-                  >
+                <div className="grid gap-3 lg:grid-cols-[1.5fr_1fr_1fr_auto]">
+                  <div className="relative">
+                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none">
+                      <IconSearch />
+                    </span>
+                    <input
+                      className="input-dark pl-10"
+                      name="search" onChange={updateFilters}
+                      placeholder="Search project, module or scenario…"
+                      type="search" value={filters.search}
+                    />
+                  </div>
+                  <select className="input-dark" name="priority" onChange={updateFilters} value={filters.priority}>
                     <option value="">All priorities</option>
-                    {priorities.map((priority) => (
-                      <option key={priority} value={priority}>
-                        {priority}
-                      </option>
-                    ))}
+                    {priorities.map((p) => <option key={p} value={p}>{p}</option>)}
                   </select>
-                  <select
-                    className="rounded-xl border border-slate-300 px-3 py-2.5 text-slate-700 outline-none transition focus:border-emerald-600 focus:ring-2 focus:ring-emerald-100"
-                    name="moduleName"
-                    onChange={updateFilters}
-                    value={filters.moduleName}
-                  >
+                  <select className="input-dark" name="moduleName" onChange={updateFilters} value={filters.moduleName}>
                     <option value="">All modules</option>
-                    {moduleOptions.map((moduleName) => (
-                      <option key={moduleName} value={moduleName}>
-                        {moduleName}
-                      </option>
-                    ))}
+                    {moduleOptions.map((m) => <option key={m} value={m}>{m}</option>)}
                   </select>
-                  <button
-                    className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-                    onClick={clearFilters}
-                    type="button"
-                  >
-                    Clear
-                  </button>
+                  <button className="btn-ghost whitespace-nowrap" onClick={clearFilters} type="button">Clear</button>
                 </div>
-              </section>
+              </div>
 
-              <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition hover:shadow-md">
-                <div className="border-b border-slate-200 px-6 py-5">
-                  <h2 className="text-lg font-semibold text-slate-950">Saved test cases</h2>
+              {/* Table */}
+              <div className="rounded-2xl overflow-hidden" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                <div className="px-6 py-5" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                  <h3 className="text-base font-semibold text-slate-200">Saved Test Cases</h3>
                   <p className="text-sm text-slate-500">
-                    {filteredSavedTestCases.length} shown, {selectedSavedIds.length} selected
+                    {filteredSavedTestCases.length} shown · {selectedSavedIds.length} selected
                   </p>
                 </div>
-
                 {savedTestCases.length === 0 ? (
-                  <div className="px-6 py-12 text-center">
-                    <EmptyStateIllustration accent="teal" />
-                    <h3 className="mt-4 text-sm font-semibold text-slate-900">No saved test cases yet</h3>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Save generated test cases to build your reusable QA library.
-                    </p>
-                  </div>
+                  <EmptyState
+                    title="No saved test cases"
+                    description="Save generated test cases to build your reusable QA library."
+                    icon={<svg width="24" height="24" fill="none" viewBox="0 0 24 24"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" stroke="#4ade80" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                  />
                 ) : filteredSavedTestCases.length === 0 ? (
-                  <div className="px-6 py-12 text-center">
-                    <EmptyStateIllustration accent="teal" />
-                    <h3 className="mt-4 text-sm font-semibold text-slate-900">No matching test cases</h3>
-                    <p className="mt-1 text-sm text-slate-500">
-                      Try changing the search text, priority, or module filter.
-                    </p>
-                  </div>
+                  <EmptyState
+                    title="No matching cases"
+                    description="Try adjusting your search or filter criteria."
+                    icon={<svg width="24" height="24" fill="none" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" stroke="#4ade80" strokeWidth="1.8"/><path d="M21 21l-4.35-4.35" stroke="#4ade80" strokeWidth="1.8" strokeLinecap="round"/></svg>}
+                  />
                 ) : (
                   <TestCasesTable
-                    editingCase={editingCase}
-                    editingId={editingId}
-                    onCancelEdit={cancelEditing}
-                    onDelete={handleDelete}
-                    onEdit={startEditing}
-                    onToggleAll={toggleAllVisibleSaved}
+                    editingCase={editingCase} editingId={editingId}
+                    onCancelEdit={cancelEditing} onDelete={handleDelete}
+                    onEdit={startEditing} onToggleAll={toggleAllVisibleSaved}
                     onToggleSelected={toggleSavedSelection}
-                    onUpdateEdit={handleUpdate}
-                    onUpdateEditingCase={updateEditingCase}
-                    selectable
-                    selectedIds={selectedSavedIds}
+                    onUpdateEdit={handleUpdate} onUpdateEditingCase={updateEditingCase}
+                    selectable selectedIds={selectedSavedIds}
                     testCases={filteredSavedTestCases}
                   />
                 )}
-              </section>
+              </div>
             </div>
           )}
 
+          {/* ══════════ DASHBOARD VIEW ══════════ */}
           {activeView === "dashboard" && (
-            <section className="grid animate-fade-in gap-5 md:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-                <SummaryIcon tone="total" />
-                <p className="mt-5 text-sm font-medium text-slate-500">Total saved test cases</p>
-                <p className="mt-3 text-3xl font-bold text-slate-950">{savedSummary.total}</p>
-                <p className="mt-3 text-sm text-slate-500">All saved cases available for review and export.</p>
+            <div className="space-y-8 animate-fade-in">
+              {/* Stat cards */}
+              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+                <StatCard
+                  label="Total Test Cases" value={savedSummary.total}
+                  description="All saved cases available for review and export."
+                  glowColor="#6366f1"
+                  icon={<svg width="20" height="20" fill="none" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1" stroke="#818cf8" strokeWidth="1.8"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="#818cf8" strokeWidth="1.8"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="#818cf8" strokeWidth="1.8"/><rect x="14" y="14" width="7" height="7" rx="1" stroke="#818cf8" strokeWidth="1.8"/></svg>}
+                />
+                <StatCard
+                  label="High Priority" value={savedSummary.High}
+                  description="Critical scenarios that should be tested first."
+                  glowColor="#ef4444"
+                  icon={<svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke="#f87171" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                />
+                <StatCard
+                  label="Medium Priority" value={savedSummary.Medium}
+                  description="Important coverage for common user workflows."
+                  glowColor="#f59e0b"
+                  icon={<svg width="20" height="20" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="#fbbf24" strokeWidth="1.8"/><path d="M12 8v4M12 16h.01" stroke="#fbbf24" strokeWidth="2" strokeLinecap="round"/></svg>}
+                />
+                <StatCard
+                  label="Low Priority" value={savedSummary.Low}
+                  description="Lower-risk checks for broader QA completeness."
+                  glowColor="#22c55e"
+                  icon={<svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4" stroke="#4ade80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><circle cx="12" cy="12" r="9" stroke="#4ade80" strokeWidth="1.8"/></svg>}
+                />
               </div>
-              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-                <SummaryIcon tone="high" />
-                <p className="mt-5 text-sm font-medium text-slate-500">High priority test cases</p>
-                <p className="mt-3 text-3xl font-bold text-slate-950">{savedSummary.High}</p>
-                <p className="mt-3 text-sm text-slate-500">Critical scenarios that should be tested first.</p>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-                <SummaryIcon tone="medium" />
-                <p className="mt-5 text-sm font-medium text-slate-500">Medium priority test cases</p>
-                <p className="mt-3 text-3xl font-bold text-slate-950">{savedSummary.Medium}</p>
-                <p className="mt-3 text-sm text-slate-500">Important coverage for common user workflows.</p>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-                <SummaryIcon tone="low" />
-                <p className="mt-5 text-sm font-medium text-slate-500">Low priority test cases</p>
-                <p className="mt-3 text-3xl font-bold text-slate-950">{savedSummary.Low}</p>
-                <p className="mt-3 text-sm text-slate-500">Lower-risk checks for broader QA completeness.</p>
-              </div>
-            </section>
+
+              {/* Priority Distribution Bar */}
+              {savedSummary.total > 0 && (
+                <div className="rounded-2xl p-6" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                  <h3 className="text-base font-semibold text-slate-200 mb-1">Priority Distribution</h3>
+                  <p className="text-sm text-slate-500 mb-6">Visual breakdown of test case priorities</p>
+                  <div className="space-y-4">
+                    {[
+                      { label: "High", value: savedSummary.High, color: "#ef4444", bg: "rgba(239,68,68,0.2)" },
+                      { label: "Medium", value: savedSummary.Medium, color: "#f59e0b", bg: "rgba(245,158,11,0.2)" },
+                      { label: "Low", value: savedSummary.Low, color: "#22c55e", bg: "rgba(34,197,94,0.2)" }
+                    ].map(({ label, value, color, bg }) => (
+                      <div key={label} className="flex items-center gap-4">
+                        <span className="text-sm text-slate-400 w-16 shrink-0">{label}</span>
+                        <div className="flex-1 rounded-full h-2.5 overflow-hidden" style={{ background: "rgba(255,255,255,0.05)" }}>
+                          <div
+                            className="h-full rounded-full transition-all duration-700"
+                            style={{
+                              width: `${savedSummary.total ? (value / savedSummary.total) * 100 : 0}%`,
+                              background: `linear-gradient(90deg, ${color}, ${color}99)`,
+                              boxShadow: `0 0 8px ${color}80`
+                            }}
+                          />
+                        </div>
+                        <span className="text-sm font-semibold text-slate-300 w-8 text-right">{value}</span>
+                        <span className="text-xs text-slate-600 w-10 text-right">
+                          {savedSummary.total ? Math.round((value / savedSummary.total) * 100) : 0}%
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {savedSummary.total === 0 && (
+                <div className="rounded-2xl" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                  <EmptyState
+                    title="No data yet"
+                    description="Generate and save test cases to see your analytics dashboard."
+                    icon={<svg width="24" height="24" fill="none" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1" stroke="#4ade80" strokeWidth="1.8"/><rect x="14" y="3" width="7" height="7" rx="1" stroke="#4ade80" strokeWidth="1.8"/><rect x="3" y="14" width="7" height="7" rx="1" stroke="#4ade80" strokeWidth="1.8"/><rect x="14" y="14" width="7" height="7" rx="1" stroke="#4ade80" strokeWidth="1.8"/></svg>}
+                  />
+                </div>
+              )}
+            </div>
           )}
+
         </div>
       </main>
     </div>
