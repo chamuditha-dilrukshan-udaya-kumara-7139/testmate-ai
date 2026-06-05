@@ -259,11 +259,39 @@ button, input, select, textarea {
 .table-dark tbody tr:hover {
   background: rgba(255,255,255,0.03);
 }
+.table-dark tbody tr.table-row-selected,
+.table-dark tbody tr.table-row-selected:hover {
+  background: rgba(16,185,129,0.1);
+}
+.table-dark tbody tr.table-row-selected td,
+.table-dark tbody tr.table-row-selected:hover td {
+  background: rgba(16,185,129,0.1);
+}
+.table-dark tbody tr.table-row-selected td:first-child {
+  box-shadow: inset 4px 0 0 #34d399;
+}
 .table-dark tbody td {
   padding: 16px 20px;
   color: #cbd5e1;
   font-size: 13.5px;
   vertical-align: top;
+}
+.bug-summary-table thead th {
+  padding: 12px 10px;
+}
+.bug-summary-table tbody td {
+  padding: 12px 10px;
+}
+.bug-summary-table thead th:first-child,
+.bug-summary-table tbody td:first-child {
+  padding-left: 12px;
+  padding-right: 8px;
+}
+.test-summary-table thead th {
+  padding: 12px 12px;
+}
+.test-summary-table tbody td {
+  padding: 12px 12px;
 }
 
 /* ─── Badge Styles ────────────────────────────────────────────── */

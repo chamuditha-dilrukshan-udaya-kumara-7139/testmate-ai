@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { jsPDF } from "jspdf";
 import * as XLSX from "xlsx";
 import { toast } from "react-toastify";
@@ -27,7 +27,7 @@ const initialForm = {
 };
 
 const initialProjectForm = { name: "", description: "" };
-const initialFilters = { search: "", priority: "", moduleName: "" };
+const initialFilters = { search: "", priority: "", moduleName: "", status: "" };
 const initialBugForm = {
   projectId: "",
   moduleName: "",
@@ -39,12 +39,15 @@ const initialBugForm = {
 };
 const initialBugFilters = { search: "", severity: "", status: "" };
 const priorities = ["High", "Medium", "Low"];
+const testStatuses = ["Not Run", "Passed", "Failed", "Blocked"];
 const severities = ["Critical", "High", "Medium", "Low"];
 const bugStatuses = ["Open", "In Progress", "Resolved", "Closed"];
+const selectOptionStyle = { backgroundColor: "#111827", color: "#f9fafb" };
+const disabledSelectOptionStyle = { backgroundColor: "#111827", color: "#9ca3af" };
 
 const exportColumns = [
   "Project Name", "Module Name", "Test Case ID",
-  "Test Scenario", "Test Steps", "Expected Result", "Priority"
+  "Test Scenario", "Test Steps", "Expected Result", "Priority", "Status"
 ];
 const bugExportColumns = [
   "Project Name", "Module Name", "Bug ID", "Bug Title",
@@ -57,6 +60,23 @@ const bugExportColumns = [
 ──────────────────────────────────────────────────────────────── */
 const formatSteps = (steps) => steps.map((s, i) => `${i + 1}. ${s}`).join("\n");
 
+const formatTestCaseId = (value, index = 0) => {
+  const raw = String(value || "").trim();
+  if (!raw) return `TC-${String(index + 1).padStart(3, "0")}`;
+
+  const prefixedMatch = raw.match(/^TC-?(\d+)$/i);
+  if (prefixedMatch) return `TC-${prefixedMatch[1].padStart(3, "0")}`;
+
+  if (/^\d+$/.test(raw)) return `TC-${raw.padStart(3, "0")}`;
+
+  const trailingNumberMatch = raw.match(/(\d+)$/);
+  if (trailingNumberMatch && !/^TC-/i.test(raw)) {
+    return `TC-${trailingNumberMatch[1].padStart(3, "0")}`;
+  }
+
+  return raw;
+};
+
 const getExportRows = (testCases) =>
   testCases.map((tc) => ({
     "Project Name": tc.projectName,
@@ -65,7 +85,8 @@ const getExportRows = (testCases) =>
     "Test Scenario": tc.testScenario,
     "Test Steps": formatSteps(tc.testSteps),
     "Expected Result": tc.expectedResult,
-    Priority: tc.priority
+    Priority: tc.priority,
+    Status: tc.status || "Not Run"
   }));
 
 const getExportFileName = (testCases, ext, prefix = "test-cases") => {
@@ -102,6 +123,26 @@ const getSeverityStyle = (severity) => {
   return map[severity] || "badge-low";
 };
 
+const getStatusStyle = (status) => {
+  const map = {
+    "Not Run": "bg-slate-500/10 text-slate-400 border border-slate-500/20",
+    Passed: "badge-low",
+    Failed: "badge-high",
+    Blocked: "badge-medium"
+  };
+  return map[status] || map["Not Run"];
+};
+
+const getStatusSelectStyle = (status) => {
+  const map = {
+    "Not Run": { background: "rgba(100,116,139,0.12)", color: "#cbd5e1", borderColor: "rgba(100,116,139,0.28)" },
+    Passed: { background: "rgba(34,197,94,0.12)", color: "#4ade80", borderColor: "rgba(34,197,94,0.28)" },
+    Failed: { background: "rgba(239,68,68,0.12)", color: "#f87171", borderColor: "rgba(239,68,68,0.28)" },
+    Blocked: { background: "rgba(245,158,11,0.12)", color: "#fbbf24", borderColor: "rgba(245,158,11,0.28)" }
+  };
+  return map[status] || map["Not Run"];
+};
+
 /* ────────────────────────────────────────────────────────────────
    Excel / PDF Export
 ──────────────────────────────────────────────────────────────── */
@@ -123,10 +164,10 @@ const createPdfExport = (testCases, filePrefix, title) => {
   const projectNames = [...new Set(testCases.map((tc) => tc.projectName).filter(Boolean))];
   const projectName = projectNames.length === 1 ? projectNames[0] : "Multiple Projects";
   const columns = [
-    { label: "Project Name", width: 30 }, { label: "Module Name", width: 30 },
-    { label: "Test Case ID", width: 22 }, { label: "Test Scenario", width: 52 },
-    { label: "Test Steps", width: 58 }, { label: "Expected Result", width: 65 },
-    { label: "Priority", width: 20 }
+    { label: "Project Name", width: 25 }, { label: "Module Name", width: 25 },
+    { label: "Test Case ID", width: 24 }, { label: "Test Scenario", width: 46 },
+    { label: "Test Steps", width: 52 }, { label: "Expected Result", width: 56 },
+    { label: "Priority", width: 18 }, { label: "Status", width: 20 }
   ];
 
   const drawPageHeader = () => {
@@ -140,7 +181,12 @@ const createPdfExport = (testCases, filePrefix, title) => {
     columns.forEach((col) => {
       doc.setFillColor(241, 245, 249); doc.setDrawColor(203, 213, 225);
       doc.rect(x, tableTop - 9, col.width, 9, "FD");
-      doc.setTextColor(15, 23, 42); doc.text(col.label, x + rowPadding, tableTop - 3.2);
+      doc.setTextColor(15, 23, 42);
+      if (col.label === "Test Case ID") {
+        doc.text("Test Case ID", x + rowPadding, tableTop - 3.2);
+      } else {
+        doc.text(col.label, x + rowPadding, tableTop - 3.2);
+      }
       x += col.width;
     });
     doc.setFont("helvetica", "normal"); doc.setFontSize(8.5);
@@ -184,6 +230,13 @@ const getBugExportRows = (bugReports) =>
     Status: bug.status
   }));
 
+const normalizeBugSteps = (steps) => {
+  const list = Array.isArray(steps) ? steps : String(steps || "").split(/\r?\n/);
+  return list
+    .map((step) => String(step || "").replace(/^\s*(?:\d+[\).:-]|\-|\*)\s*/, "").trim())
+    .filter(Boolean);
+};
+
 const createBugExcelExport = (bugReports) => {
   const ws = XLSX.utils.json_to_sheet(getBugExportRows(bugReports), { header: bugExportColumns });
   ws["!cols"] = [{ wch: 22 }, { wch: 18 }, { wch: 14 }, { wch: 36 }, { wch: 48 }, { wch: 42 }, { wch: 42 }, { wch: 12 }, { wch: 12 }, { wch: 24 }, { wch: 14 }];
@@ -193,51 +246,129 @@ const createBugExcelExport = (bugReports) => {
 };
 
 const createBugPdfExport = (bugReports) => {
-  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-  const rows = getBugExportRows(bugReports);
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const pageWidth = doc.internal.pageSize.getWidth();
-  const margin = 10;
-  const lineHeight = 4.3;
-  const columns = [
-    { label: "Project Name", width: 25 }, { label: "Module Name", width: 24 }, { label: "Bug ID", width: 18 },
-    { label: "Bug Title", width: 38 }, { label: "Steps to Reproduce", width: 45 }, { label: "Expected Result", width: 42 },
-    { label: "Actual Result", width: 42 }, { label: "Severity", width: 18 }, { label: "Priority", width: 18 },
-    { label: "Environment", width: 28 }, { label: "Status", width: 18 }
-  ];
-  let y = 28;
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 14;
+  const contentWidth = pageWidth - margin * 2;
+  const footerY = pageHeight - 10;
+  const lineHeight = 5;
+  const labelColumnWidth = 34;
+  const generatedDate = new Date().toLocaleDateString();
+  let y = 30;
 
   const drawHeader = () => {
-    doc.setFont("helvetica", "bold"); doc.setFontSize(15); doc.setTextColor(15, 23, 42);
-    doc.text("Bug Reports", margin, 12);
-    doc.setFontSize(8); doc.text(`Total Records: ${bugReports.length}`, pageWidth - margin, 12, { align: "right" });
-    let x = margin;
-    doc.setFontSize(7.5); doc.setDrawColor(203, 213, 225);
-    columns.forEach((col) => {
-      doc.setFillColor(241, 245, 249);
-      doc.rect(x, 18, col.width, 8, "FD");
-      doc.text(col.label, x + 1.5, 23);
-      x += col.width;
-    });
-    doc.setFont("helvetica", "normal"); doc.setFontSize(7.3); doc.setTextColor(30, 41, 59);
+    doc.setTextColor(15, 23, 42);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text("Bug Reports", margin, 14);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text(`Total Records: ${bugReports.length}`, margin, 21);
+    doc.text(`Generated Date: ${generatedDate}`, pageWidth - margin, 21, { align: "right" });
+    doc.setDrawColor(203, 213, 225);
+    doc.line(margin, 25, pageWidth - margin, 25);
+  };
+
+  const ensureSpace = (requiredHeight = 18) => {
+    if (y + requiredHeight <= footerY) return;
+    doc.addPage();
+    drawHeader();
+    y = 32;
   };
 
   drawHeader();
-  rows.forEach((row) => {
-    const wrapped = columns.map((col) => doc.splitTextToSize(String(row[col.label] || ""), col.width - 3));
-    const rowHeight = Math.max(...wrapped.map((cell) => cell.length)) * lineHeight + 3;
-    if (y + rowHeight > 195) {
-      doc.addPage();
-      y = 28;
-      drawHeader();
-    }
-    let x = margin;
-    wrapped.forEach((cell, i) => {
-      doc.rect(x, y, columns[i].width, rowHeight);
-      doc.text(cell, x + 1.5, y + 4);
-      x += columns[i].width;
+  bugReports.forEach((bug, index) => {
+    ensureSpace(42);
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setTextColor(15, 23, 42);
+    doc.text(`Bug Report ${index + 1}`, margin, y);
+    y += 7;
+
+    const metaRows = [
+      ["Project Name", bug.projectName || "No project"],
+      ["Module Name", bug.moduleName || "Not specified"],
+      ["Bug ID", bug.bugId || "Not specified"],
+      ["Bug Title", bug.bugTitle || "Not specified"],
+      ["Severity", bug.severity || "Not specified"],
+      ["Priority", bug.priority || "Not specified"],
+      ["Status", bug.status || "Not specified"],
+      ["Environment", bug.environment || "Not specified"]
+    ];
+
+    metaRows.forEach(([label, value]) => {
+      const labelText = `${label}:`;
+      const valueX = margin + labelColumnWidth;
+      const valueWidth = contentWidth - labelColumnWidth;
+      const wrappedValue = doc.splitTextToSize(String(value), valueWidth);
+      ensureSpace(Math.max(wrappedValue.length, 1) * lineHeight + 2);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9.5);
+      doc.setTextColor(30, 41, 59);
+      doc.text(labelText, margin, y);
+      doc.setFont("helvetica", "normal");
+      doc.text(wrappedValue, valueX, y);
+      y += Math.max(wrappedValue.length, 1) * lineHeight;
     });
-    y += rowHeight;
+
+    y += 3;
+    ensureSpace(12);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text("Steps to Reproduce:", margin, y);
+    y += 6;
+
+    const steps = normalizeBugSteps(bug.stepsToReproduce);
+    const stepRows = steps.length ? steps : ["No steps provided"];
+    stepRows.forEach((step, stepIndex) => {
+      const prefix = `${stepIndex + 1}. `;
+      const prefixWidth = doc.getTextWidth(prefix);
+      const wrappedStep = doc.splitTextToSize(step, contentWidth - prefixWidth);
+      ensureSpace(wrappedStep.length * lineHeight + 2);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9.5);
+      doc.setTextColor(30, 41, 59);
+      doc.text(prefix, margin, y);
+      doc.text(wrappedStep, margin + prefixWidth, y);
+      y += wrappedStep.length * lineHeight;
+    });
+
+    const writeBlock = (label, value) => {
+      y += 3;
+      ensureSpace(15);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(30, 41, 59);
+      doc.text(`${label}:`, margin, y);
+      y += 6;
+      const lines = doc.splitTextToSize(String(value || "Not specified"), contentWidth);
+      ensureSpace(lines.length * lineHeight + 2);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9.5);
+      doc.text(lines, margin, y);
+      y += lines.length * lineHeight;
+    };
+
+    writeBlock("Expected Result", bug.expectedResult);
+    writeBlock("Actual Result", bug.actualResult);
+
+    y += 4;
+    doc.setDrawColor(203, 213, 225);
+    doc.line(margin, y, pageWidth - margin, y);
+    y += 9;
   });
+
+  const totalPages = doc.getNumberOfPages();
+  for (let page = 1; page <= totalPages; page++) {
+    doc.setPage(page);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`Page ${page} of ${totalPages}`, pageWidth - margin, footerY, { align: "right" });
+  }
+
   doc.save("bug-reports.pdf");
 };
 
@@ -333,6 +464,12 @@ const IconX = () => (
     <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
   </svg>
 );
+const IconEye = () => (
+  <svg width="13" height="13" fill="none" viewBox="0 0 24 24">
+    <path d="M1.5 12s3.75-7 10.5-7 10.5 7 10.5 7-3.75 7-10.5 7S1.5 12 1.5 12z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+    <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.8"/>
+  </svg>
+);
 
 /* ────────────────────────────────────────────────────────────────
    Empty State
@@ -359,20 +496,24 @@ const EmptyState = ({ title, description, icon }) => (
 const TestCasesTable = ({
   testCases, editingCase, editingId,
   onCancelEdit, onDelete, onEdit, onSave, onUpdateEdit, onUpdateEditingCase, onUpdateEditingProject,
+  onStatusChange, onViewDetails,
   projects = [],
   loading = {},
   selectable = false, selectedIds = [], onToggleSelected, onToggleAll,
-  showSave = false
+  showSave = false,
+  compact = false,
+  generatedSummary = false
 }) => {
   const allSelected = selectable && testCases.length > 0 && testCases.every((tc) => selectedIds.includes(tc.id));
+  const compactColSpan = generatedSummary ? 5 : selectable ? 8 : 7;
 
   return (
-    <div className="overflow-x-auto">
-      <table className="min-w-[1320px] table-fixed border-collapse text-left text-sm table-dark w-full">
+    <div className={`overflow-x-auto ${compact ? "px-3 sm:px-5" : ""}`}>
+      <table className={`${compact ? generatedSummary ? "min-w-0" : "min-w-[1040px]" : "min-w-[1420px]"} ${generatedSummary ? "test-summary-table" : ""} table-fixed border-collapse text-left text-sm table-dark w-full`}>
         <thead>
           <tr>
             {selectable && (
-              <th className="w-12 px-5 py-4">
+              <th className={compact ? "w-14 px-5 py-3" : "w-12 px-5 py-4"}>
                 <input
                   className="h-4 w-4 rounded border-0 cursor-pointer"
                   style={{ accentColor: "#22c55e" }}
@@ -382,26 +523,51 @@ const TestCasesTable = ({
                 />
               </th>
             )}
-            <th className="w-36 px-5 py-4">Project</th>
-            <th className="w-36 px-5 py-4">Module</th>
-            <th className="w-28 px-5 py-4">ID</th>
-            <th className="w-64 px-5 py-4">Scenario</th>
-            <th className="w-72 px-5 py-4">Steps</th>
-            <th className="w-72 px-5 py-4">Expected Result</th>
-            <th className="w-24 px-5 py-4">Priority</th>
-            <th className="w-52 px-5 py-4">Actions</th>
+            {generatedSummary ? (
+              <>
+                <th className="w-[13%] px-4 py-3">Test Case ID</th>
+                <th className="w-[45%] px-3 py-3">Test Scenario</th>
+                <th className="w-[10%] px-3 py-3">Priority</th>
+                <th className="w-[12%] px-3 py-3">Status</th>
+                <th className="w-[20%] px-3 py-3">Actions</th>
+              </>
+            ) : compact ? (
+              <>
+                <th className="w-[10%] px-4 py-3">ID</th>
+                <th className="w-[13%] px-3 py-3">Project</th>
+                <th className="w-[10%] px-3 py-3">Module</th>
+                <th className="w-[28%] px-3 py-3">Scenario</th>
+                <th className="w-[8%] px-3 py-3">Priority</th>
+                <th className="w-[11%] px-3 py-3">Status</th>
+                <th className="w-[20%] px-3 py-3">Actions</th>
+              </>
+            ) : (
+              <>
+                <th className="w-36 px-5 py-4">Project</th>
+                <th className="w-36 px-5 py-4">Module</th>
+                <th className="w-28 px-5 py-4">ID</th>
+                <th className="w-64 px-5 py-4">Scenario</th>
+                <th className="w-72 px-5 py-4">Steps</th>
+                <th className="w-72 px-5 py-4">Expected Result</th>
+                <th className="w-24 px-5 py-4">Priority</th>
+                <th className="w-32 px-5 py-4">Status</th>
+                <th className="w-52 px-5 py-4">Actions</th>
+              </>
+            )}
           </tr>
         </thead>
         <tbody>
-          {testCases.map((tc) => {
+          {testCases.map((tc, index) => {
             const isEditing = editingId === tc.id;
             const isSaving = loading.savingId === tc.id;
             const isDeleting = loading.deletingId === tc.id;
             const isUpdating = isEditing && loading.updatingCase;
+            const isSelected = selectable && selectedIds.includes(tc.id);
             return (
-              <tr key={tc.id} className="align-top transition-colors duration-150">
+              <Fragment key={tc.id}>
+              <tr className={`align-top transition-colors duration-150 ${isSelected ? "table-row-selected" : ""}`}>
                 {selectable && (
-                  <td className="px-5 py-4">
+                  <td className={compact ? "px-5 py-3" : "px-5 py-4"}>
                     <input
                       className="h-4 w-4 rounded cursor-pointer"
                       style={{ accentColor: "#22c55e" }}
@@ -411,56 +577,83 @@ const TestCasesTable = ({
                     />
                   </td>
                 )}
-                <td className="px-5 py-4">
+                {compact && (
+                  <td className="px-4 py-3">
+                    <span className="font-mono text-xs font-semibold text-green-400 tracking-wide whitespace-nowrap">
+                      {formatTestCaseId(tc.testCaseId, index)}
+                    </span>
+                  </td>
+                )}
+                {!generatedSummary && (
+                <td className={compact ? "px-3 py-3" : "px-5 py-4"}>
                   {isEditing ? (
                     <select className="input-dark text-xs" name="projectId" onChange={onUpdateEditingProject} value={editingCase.projectId || ""}>
                       {!editingCase.projectId && editingCase.projectName && (
-                        <option value="">{editingCase.projectName}</option>
+                        <option style={selectOptionStyle} value="">{editingCase.projectName}</option>
                       )}
-                      <option value="" disabled>Select project</option>
-                      {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+                      <option style={disabledSelectOptionStyle} value="" disabled>Select project</option>
+                      {projects.map((project) => <option key={project.id} style={selectOptionStyle} value={project.id}>{project.name}</option>)}
                     </select>
                   ) : (
-                    <span className="text-slate-300">{tc.projectName}</span>
+                    <span className="text-slate-300 break-words">{tc.projectName}</span>
                   )}
                 </td>
-                <td className="px-5 py-4">
+                )}
+                {!generatedSummary && (
+                <td className={compact ? "px-3 py-3" : "px-5 py-4"}>
                   {isEditing ? (
                     <input className="input-dark text-xs" name="moduleName" onChange={onUpdateEditingCase} value={editingCase.moduleName} />
                   ) : (
-                    <span className="text-slate-300">{tc.moduleName}</span>
+                    <span className="text-slate-300 break-words">{tc.moduleName}</span>
                   )}
                 </td>
-                <td className="px-5 py-4">
-                  <span className="font-mono text-xs font-semibold text-green-400">{tc.testCaseId}</span>
-                </td>
-                <td className="px-5 py-4">
+                )}
+                {!compact && (
+                  <td className="px-5 py-4">
+                    <span className="font-mono text-xs font-semibold text-green-400">{formatTestCaseId(tc.testCaseId, index)}</span>
+                  </td>
+                )}
+                <td className={compact ? "px-3 py-3" : "px-5 py-4"}>
                   {isEditing ? (
                     <textarea className="input-dark text-xs min-h-20" name="testScenario" onChange={onUpdateEditingCase} value={editingCase.testScenario} />
+                  ) : compact ? (
+                    <button
+                      className="block w-full text-left text-xs leading-relaxed text-slate-300 transition-colors duration-150 hover:text-green-300 focus:outline-none focus:text-green-300"
+                      aria-label={`View details for ${formatTestCaseId(tc.testCaseId, index)}`}
+                      onClick={() => onViewDetails({ ...tc, displayTestCaseId: formatTestCaseId(tc.testCaseId, index) })}
+                      title="View details"
+                      type="button"
+                    >
+                      <span className="line-clamp-2 break-words underline-offset-4 hover:underline">{tc.testScenario}</span>
+                    </button>
                   ) : (
-                    <span className="text-slate-300 text-xs leading-relaxed">{tc.testScenario}</span>
+                    <span className={`text-slate-300 text-xs leading-relaxed ${compact ? "line-clamp-2 break-words" : ""}`}>{tc.testScenario}</span>
                   )}
                 </td>
-                <td className="px-5 py-4">
-                  {isEditing ? (
-                    <textarea className="input-dark text-xs min-h-28" name="testSteps" onChange={onUpdateEditingCase} value={editingCase.testSteps} />
-                  ) : (
-                    <ol className="list-decimal pl-4 space-y-1 text-xs text-slate-400">
-                      {tc.testSteps.map((step, i) => <li key={i}>{step}</li>)}
-                    </ol>
-                  )}
-                </td>
-                <td className="px-5 py-4">
-                  {isEditing ? (
-                    <textarea className="input-dark text-xs min-h-20" name="expectedResult" onChange={onUpdateEditingCase} value={editingCase.expectedResult} />
-                  ) : (
-                    <span className="text-slate-300 text-xs leading-relaxed">{tc.expectedResult}</span>
-                  )}
-                </td>
-                <td className="px-5 py-4">
+                {!compact && (
+                  <>
+                    <td className="px-5 py-4">
+                      {isEditing ? (
+                        <textarea className="input-dark text-xs min-h-28" name="testSteps" onChange={onUpdateEditingCase} value={editingCase.testSteps} />
+                      ) : (
+                        <ol className="list-decimal pl-4 space-y-1 text-xs text-slate-400">
+                          {tc.testSteps.map((step, i) => <li key={i}>{step}</li>)}
+                        </ol>
+                      )}
+                    </td>
+                    <td className="px-5 py-4">
+                      {isEditing ? (
+                        <textarea className="input-dark text-xs min-h-20" name="expectedResult" onChange={onUpdateEditingCase} value={editingCase.expectedResult} />
+                      ) : (
+                        <span className="text-slate-300 text-xs leading-relaxed">{tc.expectedResult}</span>
+                      )}
+                    </td>
+                  </>
+                )}
+                <td className={compact ? "px-3 py-3" : "px-5 py-4"}>
                   {isEditing ? (
                     <select className="input-dark text-xs" name="priority" onChange={onUpdateEditingCase} value={editingCase.priority}>
-                      {priorities.map((p) => <option key={p}>{p}</option>)}
+                      {priorities.map((p) => <option key={p} style={selectOptionStyle}>{p}</option>)}
                     </select>
                   ) : (
                     <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${getPriorityStyle(tc.priority)}`}>
@@ -468,18 +661,35 @@ const TestCasesTable = ({
                     </span>
                   )}
                 </td>
-                <td className="px-5 py-4">
+                <td className={compact ? "px-3 py-3" : "px-5 py-4"}>
+                  {tc.saved ? (
+                    <select
+                      className="h-8 min-w-24 rounded-full px-3 pr-7 text-xs font-semibold outline-none transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60"
+                      disabled={loading.statusId === tc.id}
+                      onChange={(e) => onStatusChange(tc, e.target.value)}
+                      style={getStatusSelectStyle(tc.status || "Not Run")}
+                      value={tc.status || "Not Run"}
+                    >
+                      {testStatuses.map((status) => <option key={status} style={selectOptionStyle} value={status}>{status}</option>)}
+                    </select>
+                  ) : (
+                    <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${getStatusStyle(tc.status || "Not Run")}`}>
+                      {tc.status || "Not Run"}
+                    </span>
+                  )}
+                </td>
+                <td className={compact ? "px-3 py-3" : "px-5 py-4"}>
                   {isEditing ? (
-                    <div className="flex gap-2 flex-wrap">
+                    <div className="flex gap-1.5 flex-wrap">
                       <button
-                        className="inline-flex items-center gap-1.5 btn-primary px-3 py-1.5 text-xs"
+                        className="inline-flex h-8 items-center gap-1.5 btn-primary px-2.5 py-1 text-xs"
                         disabled={isUpdating}
                         onClick={onUpdateEdit} type="button"
                       >
                         {isUpdating ? <><span className="spinner" /> Saving...</> : <><IconCheck /> Save</>}
                       </button>
                       <button
-                        className="inline-flex items-center gap-1.5 btn-ghost px-3 py-1.5 text-xs"
+                        className="inline-flex h-8 items-center gap-1.5 btn-ghost px-2.5 py-1 text-xs"
                         disabled={isUpdating}
                         onClick={onCancelEdit} type="button"
                       >
@@ -487,10 +697,10 @@ const TestCasesTable = ({
                       </button>
                     </div>
                   ) : (
-                    <div className="flex gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5 flex-nowrap whitespace-nowrap">
                       {showSave && (
                         <button
-                          className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium transition-all duration-200"
+                          className="inline-flex h-8 items-center gap-1.5 text-xs px-2.5 py-1 rounded-lg font-medium transition-all duration-200"
                           style={tc.saved ? {
                             background: "rgba(34,197,94,0.08)", color: "#4ade80",
                             border: "1px solid rgba(34,197,94,0.15)", cursor: "default"
@@ -506,19 +716,64 @@ const TestCasesTable = ({
                         </button>
                       )}
                       <button
-                        className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium transition-all duration-200"
+                        className="inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-all duration-200"
+                        aria-label={`Edit ${formatTestCaseId(tc.testCaseId, index)}`}
                         style={{ background: "rgba(148,163,184,0.08)", color: "#94a3b8", border: "1px solid rgba(148,163,184,0.15)" }}
-                        onClick={() => onEdit(tc)} type="button"
+                        onClick={() => onEdit(tc)}
+                        title="Edit"
+                        type="button"
                       >
                         <IconEdit /> Edit
                       </button>
-                      <button className="btn-danger inline-flex items-center gap-1.5" disabled={isDeleting} onClick={() => onDelete(tc)} type="button">
+                      <button
+                        className="btn-danger inline-flex h-8 items-center gap-1.5 px-2.5 py-1 text-xs"
+                        aria-label={`Delete ${formatTestCaseId(tc.testCaseId, index)}`}
+                        disabled={isDeleting}
+                        onClick={() => onDelete(tc)}
+                        title="Delete"
+                        type="button"
+                      >
                         {isDeleting ? <><span className="spinner" /> Deleting...</> : <><IconTrash /> Delete</>}
                       </button>
                     </div>
                   )}
                 </td>
               </tr>
+              {compact && isEditing && (
+                <tr className="align-top">
+                  <td className="px-4 pb-5 pt-0" colSpan={compactColSpan}>
+                    <div className="grid gap-4 md:grid-cols-2 rounded-xl p-4" style={{ background: "rgba(15,23,42,0.45)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                      {generatedSummary && (
+                        <>
+                          <label className="block">
+                            <span className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Project</span>
+                            <select className="input-dark text-xs" name="projectId" onChange={onUpdateEditingProject} value={editingCase.projectId || ""}>
+                              {!editingCase.projectId && editingCase.projectName && (
+                                <option style={selectOptionStyle} value="">{editingCase.projectName}</option>
+                              )}
+                              <option style={disabledSelectOptionStyle} value="" disabled>Select project</option>
+                              {projects.map((project) => <option key={project.id} style={selectOptionStyle} value={project.id}>{project.name}</option>)}
+                            </select>
+                          </label>
+                          <label className="block">
+                            <span className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Module</span>
+                            <input className="input-dark text-xs" name="moduleName" onChange={onUpdateEditingCase} value={editingCase.moduleName} />
+                          </label>
+                        </>
+                      )}
+                      <label className="block">
+                        <span className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Test Steps</span>
+                        <textarea className="input-dark text-xs min-h-32" name="testSteps" onChange={onUpdateEditingCase} value={editingCase.testSteps} />
+                      </label>
+                      <label className="block">
+                        <span className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Expected Result</span>
+                        <textarea className="input-dark text-xs min-h-32" name="expectedResult" onChange={onUpdateEditingCase} value={editingCase.expectedResult} />
+                      </label>
+                    </div>
+                  </td>
+                </tr>
+              )}
+              </Fragment>
             );
           })}
         </tbody>
@@ -539,17 +794,19 @@ const BugReportsTable = ({
   onToggleSelected,
   onUpdate,
   onUpdateEditingBug,
+  onViewDetails,
   projects,
   selectedIds = []
 }) => {
   const allSelected = bugReports.length > 0 && bugReports.every((bug) => selectedIds.includes(bug.id));
+  const colSpan = 9;
 
   return (
-    <div className="overflow-x-auto">
-    <table className="min-w-[1540px] table-fixed border-collapse text-left text-sm table-dark w-full">
+    <div className="overflow-hidden px-3 sm:px-5">
+    <table className="bug-summary-table min-w-0 table-fixed border-collapse text-left text-sm table-dark w-full">
       <thead>
         <tr>
-          <th className="w-12 px-5 py-4">
+          <th className="w-10 px-3 py-3">
             <input
               className="h-4 w-4 rounded border-0 cursor-pointer"
               style={{ accentColor: "#22c55e" }}
@@ -558,18 +815,14 @@ const BugReportsTable = ({
               type="checkbox"
             />
           </th>
-          <th className="w-36 px-5 py-4">Project</th>
-          <th className="w-32 px-5 py-4">Module</th>
-          <th className="w-28 px-5 py-4">Bug ID</th>
-          <th className="w-56 px-5 py-4">Title</th>
-          <th className="w-72 px-5 py-4">Steps</th>
-          <th className="w-60 px-5 py-4">Expected</th>
-          <th className="w-60 px-5 py-4">Actual</th>
-          <th className="w-28 px-5 py-4">Severity</th>
-          <th className="w-28 px-5 py-4">Priority</th>
-          <th className="w-44 px-5 py-4">Environment</th>
-          <th className="w-28 px-5 py-4">Status</th>
-          <th className="w-48 px-5 py-4">Actions</th>
+          <th className="w-[9%] px-2.5 py-3">Bug ID</th>
+          <th className="w-[12%] px-2.5 py-3">Project</th>
+          <th className="w-[10%] px-2.5 py-3">Module</th>
+          <th className="w-[26%] px-2.5 py-3">Bug Title</th>
+          <th className="w-[9%] px-2.5 py-3">Severity</th>
+          <th className="w-[8%] px-2.5 py-3">Priority</th>
+          <th className="w-[10%] px-2.5 py-3">Status</th>
+          <th className="w-[16%] px-2.5 py-3">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -577,10 +830,12 @@ const BugReportsTable = ({
           const isEditing = editingBugId === bug.id;
           const isUpdating = isEditing && loading.updatingBug;
           const isDeleting = loading.deletingBugId === bug.id;
+          const isSelected = selectedIds.includes(bug.id);
 
           return (
-            <tr key={bug.id} className="align-top transition-colors duration-150">
-              <td className="px-5 py-4">
+            <Fragment key={bug.id}>
+            <tr className={`align-top transition-colors duration-150 ${isSelected ? "table-row-selected" : ""}`}>
+              <td className="px-3 py-3">
                 <input
                   className="h-4 w-4 rounded cursor-pointer"
                   style={{ accentColor: "#22c55e" }}
@@ -589,46 +844,75 @@ const BugReportsTable = ({
                   type="checkbox"
                 />
               </td>
-              <td className="px-5 py-4">
+              <td className="px-2.5 py-3"><span className="block truncate font-mono text-xs font-semibold text-green-400 tracking-wide">{bug.bugId}</span></td>
+              <td className="px-2.5 py-3">
                 {isEditing ? (
                   <select className="input-dark text-xs" name="projectId" onChange={onUpdateEditingBug} value={editingBug.projectId || ""}>
-                    <option value="">No project</option>
-                    {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+                    <option style={selectOptionStyle} value="">No project</option>
+                    {projects.map((project) => <option key={project.id} style={selectOptionStyle} value={project.id}>{project.name}</option>)}
                   </select>
-                ) : <span className="text-slate-300">{bug.projectName || "No project"}</span>}
+                ) : <span className="block truncate text-slate-300" title={bug.projectName || "No project"}>{bug.projectName || "No project"}</span>}
               </td>
-              <td className="px-5 py-4">{isEditing ? <input className="input-dark text-xs" name="moduleName" onChange={onUpdateEditingBug} value={editingBug.moduleName} /> : <span className="text-slate-300">{bug.moduleName}</span>}</td>
-              <td className="px-5 py-4"><span className="font-mono text-xs font-semibold text-green-400">{bug.bugId}</span></td>
-              <td className="px-5 py-4">{isEditing ? <textarea className="input-dark text-xs min-h-20" name="bugTitle" onChange={onUpdateEditingBug} value={editingBug.bugTitle} /> : <span className="text-slate-300 text-xs leading-relaxed">{bug.bugTitle}</span>}</td>
-              <td className="px-5 py-4">{isEditing ? <textarea className="input-dark text-xs min-h-28" name="stepsToReproduce" onChange={onUpdateEditingBug} value={editingBug.stepsToReproduce} /> : <ol className="list-decimal pl-4 space-y-1 text-xs text-slate-400">{(bug.stepsToReproduce || []).map((step, i) => <li key={i}>{step}</li>)}</ol>}</td>
-              <td className="px-5 py-4">{isEditing ? <textarea className="input-dark text-xs min-h-20" name="expectedResult" onChange={onUpdateEditingBug} value={editingBug.expectedResult} /> : <span className="text-slate-300 text-xs leading-relaxed">{bug.expectedResult}</span>}</td>
-              <td className="px-5 py-4">{isEditing ? <textarea className="input-dark text-xs min-h-20" name="actualResult" onChange={onUpdateEditingBug} value={editingBug.actualResult} /> : <span className="text-slate-300 text-xs leading-relaxed">{bug.actualResult}</span>}</td>
-              <td className="px-5 py-4">{isEditing ? <select className="input-dark text-xs" name="severity" onChange={onUpdateEditingBug} value={editingBug.severity}>{severities.map((severity) => <option key={severity}>{severity}</option>)}</select> : <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${getSeverityStyle(bug.severity)}`}>{bug.severity}</span>}</td>
-              <td className="px-5 py-4">{isEditing ? <select className="input-dark text-xs" name="priority" onChange={onUpdateEditingBug} value={editingBug.priority}>{priorities.map((priority) => <option key={priority}>{priority}</option>)}</select> : <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${getPriorityStyle(bug.priority)}`}>{bug.priority}</span>}</td>
-              <td className="px-5 py-4">{isEditing ? <input className="input-dark text-xs" name="environment" onChange={onUpdateEditingBug} value={editingBug.environment} /> : <span className="text-slate-300 text-xs">{bug.environment || "Not specified"}</span>}</td>
-              <td className="px-5 py-4">{isEditing ? <select className="input-dark text-xs" name="status" onChange={onUpdateEditingBug} value={editingBug.status}>{bugStatuses.map((status) => <option key={status}>{status}</option>)}</select> : <span className="text-xs font-semibold text-green-400">{bug.status}</span>}</td>
-              <td className="px-5 py-4">
+              <td className="px-2.5 py-3">{isEditing ? <input className="input-dark text-xs" name="moduleName" onChange={onUpdateEditingBug} value={editingBug.moduleName} /> : <span className="block truncate text-slate-300" title={bug.moduleName}>{bug.moduleName}</span>}</td>
+              <td className="px-2.5 py-3">
                 {isEditing ? (
-                  <div className="flex gap-2 flex-wrap">
-                    <button className="inline-flex items-center gap-1.5 btn-primary px-3 py-1.5 text-xs" disabled={isUpdating} onClick={onUpdate} type="button">
+                  <textarea className="input-dark text-xs min-h-20" name="bugTitle" onChange={onUpdateEditingBug} value={editingBug.bugTitle} />
+                ) : (
+                  <button className="block w-full text-left text-xs leading-relaxed text-slate-300 transition-colors duration-150 hover:text-green-300 focus:outline-none focus:text-green-300" onClick={() => onViewDetails(bug)} title="View details" type="button">
+                    <span className="line-clamp-2 break-words underline-offset-4 hover:underline">{bug.bugTitle}</span>
+                  </button>
+                )}
+              </td>
+              <td className="px-2.5 py-3">{isEditing ? <select className="input-dark text-xs" name="severity" onChange={onUpdateEditingBug} value={editingBug.severity}>{severities.map((severity) => <option key={severity} style={selectOptionStyle}>{severity}</option>)}</select> : <span className={`inline-flex max-w-full px-2 py-1 rounded-full text-xs font-semibold ${getSeverityStyle(bug.severity)}`}>{bug.severity}</span>}</td>
+              <td className="px-2.5 py-3">{isEditing ? <select className="input-dark text-xs" name="priority" onChange={onUpdateEditingBug} value={editingBug.priority}>{priorities.map((priority) => <option key={priority} style={selectOptionStyle}>{priority}</option>)}</select> : <span className={`inline-flex max-w-full px-2 py-1 rounded-full text-xs font-semibold ${getPriorityStyle(bug.priority)}`}>{bug.priority}</span>}</td>
+              <td className="px-2.5 py-3">{isEditing ? <select className="input-dark text-xs" name="status" onChange={onUpdateEditingBug} value={editingBug.status}>{bugStatuses.map((status) => <option key={status} style={selectOptionStyle}>{status}</option>)}</select> : <span className="block truncate text-xs font-semibold text-green-400" title={bug.status}>{bug.status}</span>}</td>
+              <td className="px-2.5 py-3">
+                {isEditing ? (
+                  <div className="flex gap-1.5 flex-wrap">
+                    <button className="inline-flex h-8 items-center gap-1.5 btn-primary px-2.5 py-1 text-xs" disabled={isUpdating} onClick={onUpdate} type="button">
                       {isUpdating ? <><span className="spinner" /> Saving...</> : <><IconCheck /> Save</>}
                     </button>
-                    <button className="inline-flex items-center gap-1.5 btn-ghost px-3 py-1.5 text-xs" disabled={isUpdating} onClick={onCancelEdit} type="button">
+                    <button className="inline-flex h-8 items-center gap-1.5 btn-ghost px-2.5 py-1 text-xs" disabled={isUpdating} onClick={onCancelEdit} type="button">
                       <IconX /> Cancel
                     </button>
                   </div>
                 ) : (
-                  <div className="flex gap-2 flex-wrap">
-                    <button className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium transition-all duration-200" style={{ background: "rgba(148,163,184,0.08)", color: "#94a3b8", border: "1px solid rgba(148,163,184,0.15)" }} onClick={() => onEdit(bug)} type="button">
-                      <IconEdit /> Edit
+                  <div className="flex items-center gap-1.5 flex-nowrap whitespace-nowrap">
+                    <button className="inline-flex h-8 items-center justify-center text-xs px-2.5 py-1 rounded-lg font-medium transition-all duration-200" style={{ background: "rgba(148,163,184,0.08)", color: "#94a3b8", border: "1px solid rgba(148,163,184,0.15)" }} onClick={() => onEdit(bug)} type="button">
+                      Edit
                     </button>
-                    <button className="btn-danger inline-flex items-center gap-1.5" disabled={isDeleting} onClick={() => onDelete(bug)} type="button">
-                      {isDeleting ? <><span className="spinner" /> Deleting...</> : <><IconTrash /> Delete</>}
+                    <button className="btn-danger inline-flex h-8 items-center justify-center px-2.5 py-1 text-xs" disabled={isDeleting} onClick={() => onDelete(bug)} type="button">
+                      {isDeleting ? <span className="spinner" /> : "Delete"}
                     </button>
                   </div>
                 )}
               </td>
             </tr>
+            {isEditing && (
+              <tr className="align-top">
+                <td className="px-4 pb-5 pt-0" colSpan={colSpan}>
+                  <div className="grid gap-4 md:grid-cols-2 rounded-xl p-4" style={{ background: "rgba(15,23,42,0.45)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                    <label className="block md:col-span-2">
+                      <span className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Steps to Reproduce</span>
+                      <textarea className="input-dark text-xs min-h-32" name="stepsToReproduce" onChange={onUpdateEditingBug} value={editingBug.stepsToReproduce} />
+                    </label>
+                    <label className="block">
+                      <span className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Expected Result</span>
+                      <textarea className="input-dark text-xs min-h-28" name="expectedResult" onChange={onUpdateEditingBug} value={editingBug.expectedResult} />
+                    </label>
+                    <label className="block">
+                      <span className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Actual Result</span>
+                      <textarea className="input-dark text-xs min-h-28" name="actualResult" onChange={onUpdateEditingBug} value={editingBug.actualResult} />
+                    </label>
+                    <label className="block md:col-span-2">
+                      <span className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Environment</span>
+                      <input className="input-dark text-xs" name="environment" onChange={onUpdateEditingBug} value={editingBug.environment || ""} />
+                    </label>
+                  </div>
+                </td>
+              </tr>
+            )}
+            </Fragment>
           );
         })}
       </tbody>
@@ -751,6 +1035,8 @@ const Dashboard = ({ user, onLogout }) => {
   const [editingBug, setEditingBug] = useState(null);
   const [selectedSavedIds, setSelectedSavedIds] = useState([]);
   const [selectedBugIds, setSelectedBugIds] = useState([]);
+  const [selectedCaseDetails, setSelectedCaseDetails] = useState(null);
+  const [selectedBugDetails, setSelectedBugDetails] = useState(null);
   const [filters, setFilters] = useState(initialFilters);
   const [editingId, setEditingId] = useState("");
   const [editingCase, setEditingCase] = useState(null);
@@ -761,6 +1047,7 @@ const Dashboard = ({ user, onLogout }) => {
     projectDeleteId: "",
     savingId: "",
     updatingCase: false,
+    statusId: "",
     deletingId: "",
     bulkDeleting: false,
     generatingBug: false,
@@ -819,7 +1106,11 @@ const Dashboard = ({ user, onLogout }) => {
     modules: new Set(savedTestCases.map((tc) => tc.moduleName).filter(Boolean)).size,
     High:   savedTestCases.filter((tc) => tc.priority === "High").length,
     Medium: savedTestCases.filter((tc) => tc.priority === "Medium").length,
-    Low:    savedTestCases.filter((tc) => tc.priority === "Low").length
+    Low:    savedTestCases.filter((tc) => tc.priority === "Low").length,
+    Passed: savedTestCases.filter((tc) => tc.status === "Passed").length,
+    Failed: savedTestCases.filter((tc) => tc.status === "Failed").length,
+    Blocked: savedTestCases.filter((tc) => tc.status === "Blocked").length,
+    NotRun: savedTestCases.filter((tc) => !tc.status || tc.status === "Not Run").length
   }), [projects.length, savedTestCases]);
 
   const bugSummary = useMemo(() => ({
@@ -866,7 +1157,8 @@ const Dashboard = ({ user, onLogout }) => {
     return savedTestCases.filter((tc) =>
       (!q || (tc.projectName || "").toLowerCase().includes(q) || (tc.moduleName || "").toLowerCase().includes(q) || (tc.testScenario || "").toLowerCase().includes(q)) &&
       (!filters.priority || tc.priority === filters.priority) &&
-      (!filters.moduleName || tc.moduleName === filters.moduleName)
+      (!filters.moduleName || tc.moduleName === filters.moduleName) &&
+      (!filters.status || (tc.status || "Not Run") === filters.status)
     );
   }, [filters, savedTestCases]);
 
@@ -1113,6 +1405,22 @@ const Dashboard = ({ user, onLogout }) => {
       toast.error(`Update failed: ${errorMessage}`);
     } finally {
       setLoadingFlag("updatingCase", false);
+    }
+  };
+
+  const handleStatusChange = async (tc, status) => {
+    setError(""); setMessage("");
+    setLoadingFlag("statusId", tc.id);
+    try {
+      const { data } = await api.put(`/tests/${tc.id}`, { status });
+      updateCaseInState(data.testCase);
+      toast.success("Test case status updated");
+    } catch (err) {
+      const errorMessage = getErrorMessage(err, "Could not update test case status");
+      setError(errorMessage);
+      toast.error(`Status update failed: ${errorMessage}`);
+    } finally {
+      setLoadingFlag("statusId", "");
     }
   };
 
@@ -1424,6 +1732,150 @@ const Dashboard = ({ user, onLogout }) => {
       }} />
 
       {/* ── Sidebar ── */}
+      {selectedCaseDetails && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6" style={{ background: "rgba(2,6,23,0.74)", backdropFilter: "blur(12px)" }}>
+          <div className="w-full max-w-3xl max-h-[88vh] overflow-y-auto rounded-2xl" style={{ background: "rgba(15,23,42,0.98)", border: "1px solid rgba(34,197,94,0.18)", boxShadow: "0 24px 80px rgba(0,0,0,0.45)" }}>
+            <div className="flex items-start justify-between gap-4 px-6 py-5" style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-green-400">Test Case Details</p>
+                <h3 className="mt-1 text-lg font-semibold text-slate-100">
+                  {selectedCaseDetails.displayTestCaseId || formatTestCaseId(selectedCaseDetails.testCaseId)}
+                </h3>
+              </div>
+              <button className="btn-ghost inline-flex items-center gap-1.5 px-3 py-2 text-xs" onClick={() => setSelectedCaseDetails(null)} type="button">
+                <IconX /> Close
+              </button>
+            </div>
+            <div className="space-y-5 px-6 py-6">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Test Case ID</p>
+                  <p className="mt-1 font-mono text-sm font-semibold text-green-400">
+                    {selectedCaseDetails.displayTestCaseId || formatTestCaseId(selectedCaseDetails.testCaseId)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Project Name</p>
+                  <p className="mt-1 text-sm text-slate-200">{selectedCaseDetails.projectName || "No project"}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Module Name</p>
+                  <p className="mt-1 text-sm text-slate-200">{selectedCaseDetails.moduleName}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Priority</p>
+                  <span className={`mt-1 inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${getPriorityStyle(selectedCaseDetails.priority)}`}>
+                    {selectedCaseDetails.priority}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Status</p>
+                  <span className={`mt-1 inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${getStatusStyle(selectedCaseDetails.status || "Not Run")}`}>
+                    {selectedCaseDetails.status || "Not Run"}
+                  </span>
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Test Scenario</p>
+                <p className="mt-2 rounded-xl p-4 text-sm leading-relaxed text-slate-200" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                  {selectedCaseDetails.testScenario}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Test Steps</p>
+                <ol className="mt-2 list-decimal space-y-2 rounded-xl py-4 pl-8 pr-4 text-sm leading-relaxed text-slate-300" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                  {(selectedCaseDetails.testSteps || []).map((step, index) => <li key={`${selectedCaseDetails.id}-step-${index}`}>{step}</li>)}
+                </ol>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Expected Result</p>
+                <p className="mt-2 rounded-xl p-4 text-sm leading-relaxed text-slate-200" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                  {selectedCaseDetails.expectedResult}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedBugDetails && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6" style={{ background: "rgba(2,6,23,0.74)", backdropFilter: "blur(12px)" }}>
+          <div className="w-full max-w-3xl max-h-[88vh] overflow-y-auto rounded-2xl" style={{ background: "rgba(15,23,42,0.98)", border: "1px solid rgba(34,197,94,0.18)", boxShadow: "0 24px 80px rgba(0,0,0,0.45)" }}>
+            <div className="flex items-start justify-between gap-4 px-6 py-5" style={{ borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-green-400">Bug Report Details</p>
+                <h3 className="mt-1 text-lg font-semibold text-slate-100">{selectedBugDetails.bugId}</h3>
+              </div>
+              <button className="btn-ghost inline-flex items-center gap-1.5 px-3 py-2 text-xs" onClick={() => setSelectedBugDetails(null)} type="button">
+                <IconX /> Close
+              </button>
+            </div>
+            <div className="space-y-5 px-6 py-6">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Bug ID</p>
+                  <p className="mt-1 font-mono text-sm font-semibold text-green-400">{selectedBugDetails.bugId}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Project Name</p>
+                  <p className="mt-1 text-sm text-slate-200">{selectedBugDetails.projectName || "No project"}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Module Name</p>
+                  <p className="mt-1 text-sm text-slate-200">{selectedBugDetails.moduleName}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Environment</p>
+                  <p className="mt-1 text-sm text-slate-200">{selectedBugDetails.environment || "Not specified"}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Severity</p>
+                  <span className={`mt-1 inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${getSeverityStyle(selectedBugDetails.severity)}`}>
+                    {selectedBugDetails.severity}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Priority</p>
+                  <span className={`mt-1 inline-flex px-2.5 py-1 rounded-full text-xs font-semibold ${getPriorityStyle(selectedBugDetails.priority)}`}>
+                    {selectedBugDetails.priority}
+                  </span>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Status</p>
+                  <p className="mt-1 text-sm font-semibold text-green-400">{selectedBugDetails.status}</p>
+                </div>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Bug Title</p>
+                <p className="mt-2 rounded-xl p-4 text-sm leading-relaxed text-slate-200" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                  {selectedBugDetails.bugTitle}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Steps to Reproduce</p>
+                <ol className="mt-2 list-decimal space-y-2 rounded-xl py-4 pl-8 pr-4 text-sm leading-relaxed text-slate-300" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                  {(selectedBugDetails.stepsToReproduce || []).map((step, index) => <li key={`${selectedBugDetails.id}-step-${index}`}>{step}</li>)}
+                </ol>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Expected Result</p>
+                  <p className="mt-2 rounded-xl p-4 text-sm leading-relaxed text-slate-200" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                    {selectedBugDetails.expectedResult}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500">Actual Result</p>
+                  <p className="mt-2 rounded-xl p-4 text-sm leading-relaxed text-slate-200" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)" }}>
+                    {selectedBugDetails.actualResult}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <aside
         className="fixed left-0 top-0 z-30 flex h-screen w-[240px] flex-col py-6 px-4"
         style={{
@@ -1583,9 +2035,9 @@ const Dashboard = ({ user, onLogout }) => {
                       required
                       value={form.projectId}
                     >
-                      <option value="">Select a project</option>
+                      <option style={disabledSelectOptionStyle} value="">Select a project</option>
                       {projects.map((project) => (
-                        <option key={project.id} value={project.id}>{project.name}</option>
+                        <option key={project.id} style={selectOptionStyle} value={project.id}>{project.name}</option>
                       ))}
                     </select>
                   </div>
@@ -1665,11 +2117,13 @@ const Dashboard = ({ user, onLogout }) => {
                     editingCase={editingCase} editingId={editingId}
                     onCancelEdit={cancelEditing} onDelete={handleDelete}
                     onEdit={startEditing} onSave={handleSave}
+                    onStatusChange={handleStatusChange}
+                    onViewDetails={setSelectedCaseDetails}
                     onUpdateEdit={handleUpdate} onUpdateEditingCase={updateEditingCase}
                     onUpdateEditingProject={updateEditingProject}
                     loading={loading}
                     projects={projects}
-                    showSave testCases={generatedTestCases}
+                    compact generatedSummary showSave testCases={generatedTestCases}
                   />
                 )}
               </div>
@@ -1780,8 +2234,8 @@ const Dashboard = ({ user, onLogout }) => {
                   <label className="space-y-2">
                     <span className="text-sm font-medium text-slate-400">Project</span>
                     <select className="input-dark" name="projectId" onChange={updateBugForm} value={bugForm.projectId}>
-                      <option value="">No project</option>
-                      {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+                      <option style={selectOptionStyle} value="">No project</option>
+                      {projects.map((project) => <option key={project.id} style={selectOptionStyle} value={project.id}>{project.name}</option>)}
                     </select>
                   </label>
                   <label className="space-y-2">
@@ -1851,15 +2305,15 @@ const Dashboard = ({ user, onLogout }) => {
 
           {activeView === "savedBugs" && (
             <div className="space-y-6 animate-fade-in">
-              <div className="rounded-2xl p-6" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between mb-5">
+              <div className="rounded-2xl p-5" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between pb-4 mb-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
                   <div>
                     <h3 className="text-base font-semibold text-slate-200">Saved Bug Reports</h3>
-                    <p className="text-sm text-slate-500 mt-0.5">{filteredBugReports.length} shown</p>
+                    <p className="text-sm text-slate-500 mt-0.5">{filteredBugReports.length} shown · {selectedBugIds.length} selected</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <button
-                      className="btn-danger inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold"
+                      className="btn-danger inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold"
                       disabled={!selectedBugIds.length || loading.bulkDeletingBugs}
                       onClick={handleDeleteSelectedBugReports}
                       style={{
@@ -1876,16 +2330,16 @@ const Dashboard = ({ user, onLogout }) => {
                 </div>
                 <div className="grid gap-3 lg:grid-cols-[1.5fr_1fr_1fr_auto] mb-5">
                   <div className="relative">
-                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"><IconSearch /></span>
-                    <input className="input-dark pl-10" name="search" onChange={updateBugFilters} placeholder="Search title, module, project, severity or status..." type="search" value={bugFilters.search} />
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none"><IconSearch /></span>
+                    <input className="input-dark !pl-12" name="search" onChange={updateBugFilters} placeholder="Search title, module, project, severity or status..." type="search" value={bugFilters.search} />
                   </div>
                   <select className="input-dark" name="severity" onChange={updateBugFilters} value={bugFilters.severity}>
-                    <option value="">All severities</option>
-                    {severities.map((severity) => <option key={severity} value={severity}>{severity}</option>)}
+                    <option style={selectOptionStyle} value="">All severities</option>
+                    {severities.map((severity) => <option key={severity} style={selectOptionStyle} value={severity}>{severity}</option>)}
                   </select>
                   <select className="input-dark" name="status" onChange={updateBugFilters} value={bugFilters.status}>
-                    <option value="">All statuses</option>
-                    {bugStatuses.map((status) => <option key={status} value={status}>{status}</option>)}
+                    <option style={selectOptionStyle} value="">All statuses</option>
+                    {bugStatuses.map((status) => <option key={status} style={selectOptionStyle} value={status}>{status}</option>)}
                   </select>
                   <button className="btn-ghost whitespace-nowrap" onClick={() => setBugFilters(initialBugFilters)} type="button">Clear</button>
                 </div>
@@ -1906,6 +2360,7 @@ const Dashboard = ({ user, onLogout }) => {
                     onToggleSelected={toggleBugSelection}
                     onUpdate={handleUpdateBugReport}
                     onUpdateEditingBug={updateEditingBug}
+                    onViewDetails={setSelectedBugDetails}
                     projects={projects}
                     selectedIds={selectedBugIds}
                   />
@@ -1917,15 +2372,17 @@ const Dashboard = ({ user, onLogout }) => {
           {activeView === "saved" && (
             <div className="space-y-6 animate-fade-in">
               {/* Filters */}
-              <div className="rounded-2xl p-6" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between mb-5">
+              <div className="rounded-2xl p-5" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between pb-4 mb-4" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
                   <div>
-                    <h3 className="text-base font-semibold text-slate-200">Filters & Export</h3>
-                    <p className="text-sm text-slate-500 mt-0.5">Filter saved cases, select rows, then export.</p>
+                    <h3 className="text-base font-semibold text-slate-200">Saved Test Cases Library</h3>
+                    <p className="text-sm text-slate-500 mt-0.5">
+                      {filteredSavedTestCases.length} shown · {selectedSavedIds.length} selected
+                    </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <button
-                      className="btn-danger inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold"
+                      className="btn-danger inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold"
                       disabled={!selectedSavedIds.length || loading.bulkDeleting}
                       onClick={handleDeleteSelected}
                       style={{
@@ -1946,27 +2403,31 @@ const Dashboard = ({ user, onLogout }) => {
                       onClick={() => exportPdf(selectedSavedTestCases, "saved-test-cases", "Saved Test Cases Report", "Select saved test cases to export")} />
                   </div>
                 </div>
-                <div className="grid gap-3 lg:grid-cols-[1.5fr_1fr_1fr_auto]">
+                <div className="grid gap-3 lg:grid-cols-[minmax(260px,1.4fr)_minmax(150px,0.8fr)_minmax(170px,0.9fr)_minmax(160px,0.8fr)_auto]">
                   <div className="relative">
-                    <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none">
+                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none">
                       <IconSearch />
                     </span>
                     <input
-                      className="input-dark pl-10"
+                      className="input-dark !pl-12"
                       name="search" onChange={updateFilters}
                       placeholder="Search project, module or scenario…"
                       type="search" value={filters.search}
                     />
                   </div>
                   <select className="input-dark" name="priority" onChange={updateFilters} value={filters.priority}>
-                    <option value="">All priorities</option>
-                    {priorities.map((p) => <option key={p} value={p}>{p}</option>)}
+                    <option style={selectOptionStyle} value="">All priorities</option>
+                    {priorities.map((p) => <option key={p} style={selectOptionStyle} value={p}>{p}</option>)}
                   </select>
                   <select className="input-dark" name="moduleName" onChange={updateFilters} value={filters.moduleName}>
-                    <option value="">All modules</option>
-                    {moduleOptions.map((m) => <option key={m} value={m}>{m}</option>)}
+                    <option style={selectOptionStyle} value="">All modules</option>
+                    {moduleOptions.map((m) => <option key={m} style={selectOptionStyle} value={m}>{m}</option>)}
                   </select>
-                  <button className="btn-ghost whitespace-nowrap" onClick={clearFilters} type="button">Clear</button>
+                  <select className="input-dark" name="status" onChange={updateFilters} value={filters.status}>
+                    <option style={selectOptionStyle} value="">All statuses</option>
+                    {testStatuses.map((status) => <option key={status} style={selectOptionStyle} value={status}>{status}</option>)}
+                  </select>
+                  <button className="btn-ghost whitespace-nowrap px-4" onClick={clearFilters} type="button">Clear</button>
                 </div>
               </div>
 
@@ -1996,11 +2457,14 @@ const Dashboard = ({ user, onLogout }) => {
                     onCancelEdit={cancelEditing} onDelete={handleDelete}
                     onEdit={startEditing} onToggleAll={toggleAllVisibleSaved}
                     onToggleSelected={toggleSavedSelection}
+                    onStatusChange={handleStatusChange}
+                    onViewDetails={setSelectedCaseDetails}
                     onUpdateEdit={handleUpdate} onUpdateEditingCase={updateEditingCase}
                     onUpdateEditingProject={updateEditingProject}
                     loading={loading}
                     projects={projects}
                     selectable selectedIds={selectedSavedIds}
+                    compact
                     testCases={filteredSavedTestCases}
                   />
                 )}
@@ -2066,6 +2530,30 @@ const Dashboard = ({ user, onLogout }) => {
                   description="Lower-risk checks for broader QA completeness."
                   glowColor="#22c55e"
                   icon={<svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4" stroke="#4ade80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><circle cx="12" cy="12" r="9" stroke="#4ade80" strokeWidth="1.8"/></svg>}
+                />
+                <StatCard
+                  label="Passed Test Cases" value={savedSummary.Passed}
+                  description="Saved cases marked as passed."
+                  glowColor="#22c55e"
+                  icon={<svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5" stroke="#4ade80" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                />
+                <StatCard
+                  label="Failed Test Cases" value={savedSummary.Failed}
+                  description="Saved cases marked as failed."
+                  glowColor="#ef4444"
+                  icon={<svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M18 6L6 18M6 6l12 12" stroke="#f87171" strokeWidth="2" strokeLinecap="round"/></svg>}
+                />
+                <StatCard
+                  label="Blocked Test Cases" value={savedSummary.Blocked}
+                  description="Saved cases blocked from execution."
+                  glowColor="#f59e0b"
+                  icon={<svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" stroke="#fbbf24" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                />
+                <StatCard
+                  label="Not Run Test Cases" value={savedSummary.NotRun}
+                  description="Saved cases not executed yet."
+                  glowColor="#64748b"
+                  icon={<svg width="20" height="20" fill="none" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" stroke="#94a3b8" strokeWidth="1.8"/><path d="M12 7v5l3 2" stroke="#94a3b8" strokeWidth="1.8" strokeLinecap="round"/></svg>}
                 />
               </div>
 

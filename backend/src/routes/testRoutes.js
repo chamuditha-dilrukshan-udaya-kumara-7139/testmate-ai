@@ -8,141 +8,229 @@ const savedTestCasesByUser = new Map();
 const templates = {
   login: [
     {
-      scenario: "Verify that a user can log in with valid credentials",
-      steps: [
-        "Open the login page",
-        "Enter a registered email address",
-        "Enter the correct password",
-        "Click the login button"
-      ],
-      expectedResult: "User is authenticated and redirected to the dashboard.",
+      scenario: "Verify login succeeds with a registered email and valid password",
+      steps: ["Open the login page", "Enter a registered email address", "Enter the matching valid password", "Click the login button", "Observe the post-login landing page"],
+      expectedResult: "The user is authenticated, the session is created, and the dashboard or configured landing page is displayed.",
       priority: "High"
     },
     {
-      scenario: "Verify that invalid login credentials are rejected",
-      steps: [
-        "Open the login page",
-        "Enter an unregistered email address or incorrect password",
-        "Click the login button"
-      ],
-      expectedResult: "System displays a clear authentication error and keeps the user on the login page.",
+      scenario: "Verify login fails with an incorrect password",
+      steps: ["Open the login page", "Enter a registered email address", "Enter an incorrect password", "Click the login button", "Review the inline or toast error message"],
+      expectedResult: "The system rejects the login attempt, keeps the user on the login page, and shows a clear invalid credentials message.",
       priority: "High"
     },
     {
-      scenario: "Verify required validation on the login form",
-      steps: [
-        "Open the login page",
-        "Leave email and password fields empty",
-        "Click the login button"
-      ],
-      expectedResult: "System prevents submission and shows required field validation messages.",
+      scenario: "Verify required validation when login fields are empty",
+      steps: ["Open the login page", "Leave email and password blank", "Click the login button", "Check validation near each required field"],
+      expectedResult: "The form is not submitted and required field validation is shown for email and password.",
       priority: "Medium"
+    },
+    {
+      scenario: "Verify email format validation on login",
+      steps: ["Open the login page", "Enter an invalid email format", "Enter any password", "Click the login button", "Check the email field validation state"],
+      expectedResult: "The system blocks submission and asks the user to enter a valid email address.",
+      priority: "Medium"
+    },
+    {
+      scenario: "Verify locked or inactive account login handling",
+      steps: ["Open the login page", "Enter credentials for a locked or inactive account", "Click the login button", "Review the account status message"],
+      expectedResult: "The system prevents access and displays an account status message without exposing sensitive account details.",
+      priority: "High"
     }
   ],
   register: [
     {
-      scenario: "Verify that a new user can register with valid details",
-      steps: [
-        "Open the registration page",
-        "Enter a valid name, email, and password",
-        "Submit the registration form"
-      ],
-      expectedResult: "Account is created successfully and the user can access the application.",
+      scenario: "Verify registration succeeds with valid user details",
+      steps: ["Open the registration page", "Enter a full name", "Enter a unique valid email address", "Enter a valid password and matching confirm password", "Submit the registration form"],
+      expectedResult: "The account is created successfully and the user sees a success message or is signed in.",
       priority: "High"
     },
     {
       scenario: "Verify duplicate email validation during registration",
-      steps: [
-        "Open the registration page",
-        "Enter an email address that is already registered",
-        "Complete all other required fields",
-        "Submit the form"
-      ],
-      expectedResult: "System rejects the request and displays a duplicate email message.",
+      steps: ["Open the registration page", "Enter a valid full name", "Enter an email address that already exists", "Enter a valid password and matching confirm password", "Submit the registration form"],
+      expectedResult: "The system rejects the registration and clearly indicates that the email is already registered.",
       priority: "High"
     },
     {
-      scenario: "Verify registration form required field validation",
-      steps: [
-        "Open the registration page",
-        "Leave one or more required fields empty",
-        "Submit the form"
-      ],
-      expectedResult: "System prevents account creation and highlights missing required fields.",
+      scenario: "Verify password confirmation mismatch validation",
+      steps: ["Open the registration page", "Enter valid name and email details", "Enter a password", "Enter a different confirm password", "Submit the registration form"],
+      expectedResult: "The account is not created and the confirm password field shows a mismatch validation message.",
+      priority: "Medium"
+    },
+    {
+      scenario: "Verify required validation on the registration form",
+      steps: ["Open the registration page", "Leave name, email, password, or confirm password blank", "Submit the registration form", "Review field-level validation messages"],
+      expectedResult: "The system blocks account creation and highlights every missing required field.",
+      priority: "Medium"
+    },
+    {
+      scenario: "Verify minimum password strength rules during registration",
+      steps: ["Open the registration page", "Enter valid name and email details", "Enter a password below the required strength or length", "Submit the registration form"],
+      expectedResult: "The system rejects the weak password and explains the password requirement that was not met.",
       priority: "Medium"
     }
   ],
   payment: [
     {
-      scenario: "Verify successful payment with valid card details",
-      steps: [
-        "Open the payment checkout page",
-        "Enter valid card and billing details",
-        "Submit the payment"
-      ],
-      expectedResult: "Payment is processed successfully and confirmation is shown.",
+      scenario: "Verify payment succeeds with valid receiver and amount details",
+      steps: ["Open the payment page", "Enter valid receiver account or card details", "Enter a valid payable amount", "Add a payment note if the field is available", "Confirm the payment"],
+      expectedResult: "The payment is submitted successfully and a confirmation message with a transaction reference is displayed.",
       priority: "High"
     },
     {
-      scenario: "Verify failed payment handling for declined card",
-      steps: [
-        "Open the payment checkout page",
-        "Enter declined card details",
-        "Submit the payment"
-      ],
-      expectedResult: "System shows a payment failure message and does not mark the order as paid.",
+      scenario: "Verify OTP-protected payment confirmation",
+      steps: ["Open the payment page", "Enter receiver account or card details", "Enter a valid amount", "Request the OTP", "Enter the received OTP", "Confirm the payment", "Open transaction history"],
+      expectedResult: "The system validates the OTP, completes the payment, and records the transaction in history.",
       priority: "High"
     },
     {
-      scenario: "Verify required validation for payment details",
-      steps: [
-        "Open the payment checkout page",
-        "Leave required card or billing fields empty",
-        "Submit the payment"
-      ],
-      expectedResult: "System prevents payment submission and displays validation messages.",
+      scenario: "Verify payment validation for missing receiver details",
+      steps: ["Open the payment page", "Leave receiver account or card details blank", "Enter a valid amount", "Attempt to confirm the payment", "Check receiver field validation"],
+      expectedResult: "The payment is not submitted and the receiver details field displays a required validation message.",
+      priority: "High"
+    },
+    {
+      scenario: "Verify payment amount boundary validation",
+      steps: ["Open the payment page", "Enter valid receiver details", "Enter zero, negative, or above-limit amount", "Attempt to confirm the payment", "Review amount validation"],
+      expectedResult: "The system blocks the payment and explains the allowed amount range.",
+      priority: "High"
+    },
+    {
+      scenario: "Verify declined payment handling",
+      steps: ["Open the payment page", "Enter receiver details linked to a declined or insufficient-funds scenario", "Enter a valid amount", "Confirm the payment", "Review the failure response"],
+      expectedResult: "The system shows a failure message, does not debit the account, and does not create a successful transaction record.",
+      priority: "High"
+    },
+    {
+      scenario: "Verify cancelled payment does not create a transaction",
+      steps: ["Open the payment page", "Enter receiver details and amount", "Proceed to the confirmation step", "Cancel the payment before final confirmation", "Check transaction history"],
+      expectedResult: "The payment is cancelled, no transaction is completed, and transaction history remains unchanged.",
+      priority: "Medium"
+    }
+  ],
+  profile: [
+    {
+      scenario: "Verify profile details can be updated successfully",
+      steps: ["Open the profile page", "Edit one or more allowed profile fields", "Save the changes", "Refresh or reopen the profile page"],
+      expectedResult: "The updated profile details are saved and remain visible after refresh.",
+      priority: "High"
+    },
+    {
+      scenario: "Verify profile image upload during profile update",
+      steps: ["Open the profile page", "Select a valid profile image file", "Upload the image", "Save profile changes", "Check the displayed profile avatar"],
+      expectedResult: "The image is uploaded successfully and the new avatar is displayed in the profile.",
+      priority: "Medium"
+    },
+    {
+      scenario: "Verify profile validation for invalid field values",
+      steps: ["Open the profile page", "Enter invalid values such as malformed phone or email data", "Save the changes", "Review validation messages"],
+      expectedResult: "The system blocks the update and highlights each invalid profile field.",
+      priority: "Medium"
+    },
+    {
+      scenario: "Verify cancelling profile edits preserves existing data",
+      steps: ["Open the profile page", "Change one or more fields", "Click cancel or navigate away without saving", "Reopen the profile page"],
+      expectedResult: "Unsaved changes are discarded and the original profile data is preserved.",
+      priority: "Low"
+    }
+  ],
+  cart: [
+    {
+      scenario: "Verify a product can be added to the shopping cart",
+      steps: ["Open the product listing or product details page", "Select a product", "Click Add to Cart", "Open the shopping cart"],
+      expectedResult: "The selected product appears in the cart with the correct name, price, and default quantity.",
+      priority: "High"
+    },
+    {
+      scenario: "Verify cart quantity update recalculates totals",
+      steps: ["Open the shopping cart", "Increase or decrease product quantity", "Apply the quantity change", "Review subtotal and total amounts"],
+      expectedResult: "The cart updates the item quantity and recalculates all totals accurately.",
+      priority: "High"
+    },
+    {
+      scenario: "Verify coupon application in the cart",
+      steps: ["Open the shopping cart", "Enter a valid coupon code", "Apply the coupon", "Review discount and final total"],
+      expectedResult: "The coupon discount is applied and the final total reflects the correct reduced amount.",
+      priority: "Medium"
+    },
+    {
+      scenario: "Verify invalid coupon handling in the cart",
+      steps: ["Open the shopping cart", "Enter an invalid or expired coupon code", "Apply the coupon", "Review the coupon validation message"],
+      expectedResult: "The system rejects the coupon and keeps the cart total unchanged.",
+      priority: "Medium"
+    },
+    {
+      scenario: "Verify a product can be removed from the cart",
+      steps: ["Open the shopping cart with at least one product", "Click Remove for a selected cart item", "Confirm the removal if prompted", "Review the updated cart contents"],
+      expectedResult: "The selected product is removed from the cart and cart totals are recalculated without that item.",
+      priority: "High"
+    },
+    {
+      scenario: "Verify out-of-stock product cannot be added to the cart",
+      steps: ["Open a product details page for an out-of-stock item", "Review the stock status", "Attempt to add the item to the cart", "Check the cart contents"],
+      expectedResult: "The system blocks the add-to-cart action and shows an out-of-stock message without adding the item.",
+      priority: "High"
+    },
+    {
+      scenario: "Verify checkout is blocked when the cart is empty",
+      steps: ["Open the shopping cart with no products added", "Click Proceed to Checkout if the action is visible", "Review the empty cart state and checkout controls"],
+      expectedResult: "The system prevents checkout and instructs the user to add products before continuing.",
+      priority: "High"
+    },
+    {
+      scenario: "Verify cart total calculation for multiple products",
+      steps: ["Add two or more products with different prices to the cart", "Set different quantities for each product", "Review subtotal, discounts, taxes, and final total", "Compare totals with expected manual calculation"],
+      expectedResult: "The cart calculates item subtotals and final total accurately for all products and quantities.",
+      priority: "High"
+    },
+    {
+      scenario: "Verify checkout can be started from the cart",
+      steps: ["Open the shopping cart with at least one product", "Verify item totals", "Click Proceed to Checkout", "Review the checkout page"],
+      expectedResult: "The user is taken to checkout with the selected cart items and totals carried forward.",
+      priority: "High"
+    },
+    {
+      scenario: "Verify saved cart persists after page refresh",
+      steps: ["Add one or more products to the shopping cart", "Refresh the page or sign out and sign back in", "Open the shopping cart", "Review persisted cart items and quantities"],
+      expectedResult: "The cart retains previously added products and quantities after refresh or session restore.",
       priority: "Medium"
     }
   ],
   generic: [
     {
-      scenario: "Verify that the feature loads successfully",
-      steps: [
-        "Open the target feature page",
-        "Review the initial page content",
-        "Confirm all key controls are visible"
-      ],
-      expectedResult: "Feature page loads without errors and all expected controls are available.",
+      scenario: "Verify the feature page loads and displays primary controls",
+      steps: ["Open the feature page", "Review the initial page content", "Confirm primary controls and required labels are visible", "Check that no error state is shown"],
+      expectedResult: "The feature loads successfully with all primary controls visible and no unexpected errors.",
       priority: "High"
     },
     {
-      scenario: "Verify valid user input is accepted",
-      steps: [
-        "Open the target feature page",
-        "Enter valid data into all required fields",
-        "Submit the form or complete the workflow"
-      ],
-      expectedResult: "System accepts the input and completes the workflow successfully.",
+      scenario: "Verify the main successful workflow for the feature",
+      steps: ["Open the feature page", "Enter valid data for required fields", "Complete the primary action", "Review the success state or resulting record"],
+      expectedResult: "The system completes the workflow and shows a clear success state with the expected data.",
       priority: "High"
     },
     {
-      scenario: "Verify validation for missing required input",
-      steps: [
-        "Open the target feature page",
-        "Leave required fields empty",
-        "Submit the form or continue the workflow"
-      ],
-      expectedResult: "System prevents submission and clearly identifies missing required inputs.",
+      scenario: "Verify validation for missing required information",
+      steps: ["Open the feature page", "Leave required fields empty", "Attempt to continue or submit", "Review validation messages"],
+      expectedResult: "The system blocks the action and identifies each missing required input.",
       priority: "Medium"
     },
     {
-      scenario: "Verify cancellation or navigation behavior",
-      steps: [
-        "Open the target feature page",
-        "Start the workflow",
-        "Cancel or navigate back before completion"
-      ],
-      expectedResult: "System exits the workflow without saving incomplete changes.",
+      scenario: "Verify invalid data is rejected by the feature",
+      steps: ["Open the feature page", "Enter invalid or unsupported values", "Submit the workflow", "Review field-level and page-level errors"],
+      expectedResult: "The system rejects invalid data without saving changes and shows actionable error messages.",
+      priority: "Medium"
+    },
+    {
+      scenario: "Verify boundary values are handled correctly",
+      steps: ["Open the feature page", "Enter minimum allowed values", "Submit and record the result", "Repeat with maximum allowed values", "Repeat with values outside the allowed range"],
+      expectedResult: "Allowed boundary values are accepted and out-of-range values are rejected with clear validation.",
+      priority: "Medium"
+    },
+    {
+      scenario: "Verify cancelling the workflow does not save partial changes",
+      steps: ["Open the feature page", "Start the workflow and enter partial data", "Cancel or navigate back before submitting", "Return to the feature and review saved data"],
+      expectedResult: "Partial changes are discarded and no incomplete data is saved.",
       priority: "Low"
     }
   ]
@@ -151,19 +239,113 @@ const templates = {
 const getRule = (featureDescription) => {
   const description = featureDescription.toLowerCase();
 
-  if (description.includes("login")) return "login";
-  if (description.includes("register")) return "register";
-  if (description.includes("payment")) return "payment";
+  if (description.includes("login") || description.includes("sign in") || description.includes("signin")) return "login";
+  if (description.includes("register") || description.includes("registration") || description.includes("sign up") || description.includes("signup")) return "register";
+  if (description.includes("payment") || description.includes("transfer") || description.includes("card") || description.includes("transaction")) return "payment";
+  if (description.includes("profile") || description.includes("account settings") || description.includes("avatar")) return "profile";
+  if (description.includes("cart") || description.includes("checkout") || description.includes("coupon") || description.includes("shopping")) return "cart";
 
   return "generic";
 };
 
+const getTemplatesForFeature = (rule, featureDescription) => {
+  const description = featureDescription.toLowerCase();
+
+  if (rule !== "payment") {
+    return templates[rule];
+  }
+
+  const mentionsOtp = description.includes("otp") || description.includes("one-time") || description.includes("one time");
+  return templates.payment.filter((template) => mentionsOtp || !template.scenario.toLowerCase().includes("otp"));
+};
+
+const buildAdditionalTemplate = (rule, featureDescription, extraIndex) => {
+  const feature = featureDescription.replace(/\s+/g, " ").trim() || "the feature";
+  const additions = [
+    {
+      scenario: `Verify boundary input handling for ${feature}`,
+      steps: ["Open the feature page", "Enter minimum allowed values", "Submit and observe the result", "Repeat with maximum allowed values", "Repeat with values outside the allowed range"],
+      expectedResult: "Boundary values inside the allowed range are accepted and out-of-range values are rejected with clear validation.",
+      priority: "Medium"
+    },
+    {
+      scenario: `Verify unauthorized access is blocked for ${feature}`,
+      steps: ["Sign out or use a user without permission", "Open the feature URL or action", "Attempt to complete the workflow", "Review the access control response"],
+      expectedResult: "The system blocks unauthorized access and does not expose or modify protected data.",
+      priority: "High"
+    },
+    {
+      scenario: `Verify data persists after completing ${feature}`,
+      steps: ["Open the feature page", "Complete the workflow with valid data", "Refresh the page or reopen the record", "Compare displayed data with submitted data"],
+      expectedResult: "Saved data remains accurate after refresh and can be retrieved consistently.",
+      priority: "Medium"
+    },
+    {
+      scenario: `Verify duplicate submission handling for ${feature}`,
+      steps: ["Open the feature page", "Enter valid workflow data", "Click the submit or confirm action twice quickly", "Review created records or confirmation messages"],
+      expectedResult: "The system processes the action once and prevents duplicate records or duplicate transactions.",
+      priority: "High"
+    },
+    {
+      scenario: `Verify keyboard accessibility for ${feature}`,
+      steps: ["Open the feature page", "Navigate through controls using the keyboard", "Complete the primary workflow without using a mouse", "Review focus order and final result"],
+      expectedResult: "The feature can be operated with the keyboard and focus remains visible and logical throughout the workflow.",
+      priority: "Low"
+    },
+    {
+      scenario: `Verify recovery after a network interruption during ${feature}`,
+      steps: ["Open the feature page", "Enter valid workflow data", "Simulate a network interruption before submission completes", "Restore connectivity and retry the action"],
+      expectedResult: "The system handles the interruption gracefully and allows the user to retry without data loss or duplication.",
+      priority: "Medium"
+    }
+  ];
+
+  if (rule === "cart") {
+    additions.unshift(
+      {
+        scenario: "Verify cart rejects quantity above available stock",
+        steps: ["Open the shopping cart with an in-stock product", "Set the quantity above available stock", "Apply the quantity update", "Review quantity validation and cart total"],
+        expectedResult: "The system rejects the excessive quantity and keeps the cart total based on a valid quantity.",
+        priority: "High"
+      },
+      {
+        scenario: "Verify cart handles price changes before checkout",
+        steps: ["Add a product to the shopping cart", "Simulate or load an updated product price", "Proceed toward checkout", "Review the price update message and total"],
+        expectedResult: "The cart alerts the user to the price change and recalculates the total before checkout continues.",
+        priority: "Medium"
+      }
+    );
+  }
+
+  return additions[extraIndex % additions.length];
+};
+
+const getUniqueTemplates = (rule, featureDescription, count) => {
+  const selectedTemplates = [...getTemplatesForFeature(rule, featureDescription)];
+  const seen = new Set(selectedTemplates.map((template) => template.scenario.toLowerCase()));
+  let extraIndex = 0;
+
+  while (selectedTemplates.length < count) {
+    const candidate = buildAdditionalTemplate(rule, featureDescription, extraIndex);
+    extraIndex += 1;
+
+    if (seen.has(candidate.scenario.toLowerCase())) {
+      continue;
+    }
+
+    seen.add(candidate.scenario.toLowerCase());
+    selectedTemplates.push(candidate);
+  }
+
+  return selectedTemplates.slice(0, count);
+};
+
 const buildTestCases = ({ projectId, projectName, moduleName, featureDescription, count }) => {
   const rule = getRule(featureDescription);
-  const selectedTemplates = templates[rule];
+  const selectedTemplates = getUniqueTemplates(rule, featureDescription, count);
 
   return Array.from({ length: count }, (_, index) => {
-    const template = selectedTemplates[index % selectedTemplates.length];
+    const template = selectedTemplates[index];
     const sequence = String(index + 1).padStart(3, "0");
 
     return {
@@ -177,6 +359,7 @@ const buildTestCases = ({ projectId, projectName, moduleName, featureDescription
       testSteps: template.steps,
       expectedResult: template.expectedResult,
       priority: template.priority,
+      status: "Not Run",
       saved: false
     };
   });
@@ -302,6 +485,7 @@ router.post("/", protect, async (req, res) => {
   const now = new Date().toISOString();
   const savedCase = {
     ...testCase,
+    status: testCase.status || userCases[existingIndex]?.status || "Not Run",
     createdAt: testCase.createdAt || userCases[existingIndex]?.createdAt || now,
     updatedAt: now,
     saved: true
@@ -346,6 +530,7 @@ router.put("/:id", protect, async (req, res) => {
     ...userCases[testCaseIndex],
     ...updates,
     id: userCases[testCaseIndex].id,
+    status: updates.status || userCases[testCaseIndex].status || "Not Run",
     createdAt: userCases[testCaseIndex].createdAt || new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     saved: true
