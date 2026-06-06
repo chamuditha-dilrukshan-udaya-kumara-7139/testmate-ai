@@ -509,7 +509,7 @@ const TestCasesTable = ({
 
   return (
     <div className={`overflow-x-auto ${compact ? "px-3 sm:px-5" : ""}`}>
-      <table className={`${compact ? generatedSummary ? "min-w-0" : "min-w-[1040px]" : "min-w-[1420px]"} ${generatedSummary ? "test-summary-table" : ""} table-fixed border-collapse text-left text-sm table-dark w-full`}>
+      <table className={`${compact ? generatedSummary ? "min-w-[760px]" : "min-w-[1040px]" : "min-w-[1420px]"} ${generatedSummary ? "test-summary-table" : ""} table-fixed border-collapse text-left text-sm table-dark w-full`}>
         <thead>
           <tr>
             {selectable && (
@@ -802,8 +802,8 @@ const BugReportsTable = ({
   const colSpan = 9;
 
   return (
-    <div className="overflow-hidden px-3 sm:px-5">
-    <table className="bug-summary-table min-w-0 table-fixed border-collapse text-left text-sm table-dark w-full">
+    <div className="overflow-x-auto px-3 sm:px-5">
+    <table className="bug-summary-table min-w-[980px] table-fixed border-collapse text-left text-sm table-dark w-full">
       <thead>
         <tr>
           <th className="w-10 px-3 py-3">
@@ -960,7 +960,7 @@ const ExportBtn = ({ icon, label, onClick, disabled, loading = false, accent = "
       type="button"
       onClick={onClick}
       disabled={disabled || loading}
-      className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200"
+      className="inline-flex min-w-0 items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200"
       style={{
         background: a.bg, color: disabled || loading ? "#475569" : a.color,
         border: `1px solid ${disabled || loading ? "rgba(71,85,105,0.2)" : a.border}`,
@@ -1020,6 +1020,7 @@ const ActivityItem = ({ title, meta, badge }) => (
 ──────────────────────────────────────────────────────────────── */
 const Dashboard = ({ user, onLogout }) => {
   const [activeView, setActiveView] = useState("generate");
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [form, setForm] = useState(initialForm);
   const [projects, setProjects] = useState([]);
   const [projectForm, setProjectForm] = useState(initialProjectForm);
@@ -1724,6 +1725,11 @@ const Dashboard = ({ user, onLogout }) => {
     dashboard: { title: "Analytics Dashboard",  sub: "Review your test case totals and priority distribution at a glance." }
   };
 
+  const handleNavChange = (viewId) => {
+    setActiveView(viewId);
+    setIsMobileMenuOpen(false);
+  };
+
   return (
     <div className="min-h-screen" style={{ background: "#0a0f1e" }}>
       {/* Background mesh */}
@@ -1876,8 +1882,17 @@ const Dashboard = ({ user, onLogout }) => {
         </div>
       )}
 
+      {isMobileMenuOpen && (
+        <button
+          aria-label="Close navigation"
+          className="fixed inset-0 z-30 bg-slate-950/70 backdrop-blur-sm lg:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+          type="button"
+        />
+      )}
+
       <aside
-        className="fixed left-0 top-0 z-30 flex h-screen w-[240px] flex-col py-6 px-4"
+        className={`fixed left-0 top-0 z-40 flex h-screen w-[280px] max-w-[calc(100vw-32px)] flex-col px-4 py-5 transition-transform duration-300 lg:w-[240px] lg:translate-x-0 lg:py-6 ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"}`}
         style={{
           background: "rgba(10,15,30,0.95)",
           borderRight: "1px solid rgba(255,255,255,0.06)",
@@ -1896,10 +1911,18 @@ const Dashboard = ({ user, onLogout }) => {
           >
             <img src={testmateLogo} alt="TestMate AI" className="w-7 h-7 rounded-lg object-contain" />
           </div>
-          <div>
+          <div className="min-w-0 flex-1">
             <p className="font-display font-bold text-base text-white leading-tight">TestMate AI</p>
             <p className="text-xs text-slate-600">QA Generator</p>
           </div>
+          <button
+            aria-label="Close navigation"
+            className="btn-ghost inline-flex h-9 w-9 items-center justify-center p-0 lg:hidden"
+            onClick={() => setIsMobileMenuOpen(false)}
+            type="button"
+          >
+            <IconX />
+          </button>
         </div>
 
         {/* Navigation */}
@@ -1913,7 +1936,7 @@ const Dashboard = ({ user, onLogout }) => {
                 <button
                   key={item.id}
                   className={`nav-item ${activeView === item.id ? "active" : ""}`}
-                  onClick={() => setActiveView(item.id)}
+                  onClick={() => handleNavChange(item.id)}
                   type="button"
                 >
                   {item.icon}
@@ -1968,18 +1991,35 @@ const Dashboard = ({ user, onLogout }) => {
       </aside>
 
       {/* ── Main ── */}
-      <main className="ml-[240px] min-h-screen relative z-10">
-        <div className="mx-auto max-w-[1200px] p-8">
+      <main className="relative z-10 min-h-screen lg:ml-[240px]">
+        <div className="mx-auto w-full max-w-[1200px] px-4 py-5 sm:px-6 lg:p-8">
+
+          <div className="mb-5 flex items-center justify-between gap-3 lg:hidden">
+            <button
+              aria-label="Open navigation"
+              className="btn-ghost inline-flex h-10 w-10 items-center justify-center p-0"
+              onClick={() => setIsMobileMenuOpen(true)}
+              type="button"
+            >
+              <svg width="18" height="18" fill="none" viewBox="0 0 24 24">
+                <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+              </svg>
+            </button>
+            <div className="min-w-0 text-right">
+              <p className="truncate text-sm font-semibold text-slate-200">{user.name}</p>
+              <p className="text-xs text-slate-500">TestMate AI</p>
+            </div>
+          </div>
 
           {/* Header */}
           <header className="mb-8 animate-fade-in">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h1 className="font-display text-2xl font-bold text-white">{pageMeta[activeView].title}</h1>
-                <p className="mt-1 text-sm text-slate-500">{pageMeta[activeView].sub}</p>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+              <div className="min-w-0">
+                <h1 className="break-words font-display text-xl font-bold text-white sm:text-2xl">{pageMeta[activeView].title}</h1>
+                <p className="mt-1 text-sm leading-relaxed text-slate-500">{pageMeta[activeView].sub}</p>
               </div>
               <div
-                className="px-3 py-1.5 rounded-lg text-sm text-slate-400 shrink-0"
+                className="hidden shrink-0 rounded-lg px-3 py-1.5 text-sm text-slate-400 sm:block"
                 style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)" }}
               >
                 👋 {user.name}
@@ -1992,7 +2032,7 @@ const Dashboard = ({ user, onLogout }) => {
             <div className="space-y-6 animate-fade-in">
               {/* Hero banner */}
               <div
-                className="rounded-2xl p-6 relative overflow-hidden"
+                className="relative overflow-hidden rounded-2xl p-5 sm:p-6"
                 style={{
                   background: "linear-gradient(135deg, rgba(22,163,74,0.12) 0%, rgba(20,184,166,0.08) 50%, rgba(6,182,212,0.06) 100%)",
                   border: "1px solid rgba(34,197,94,0.2)"
@@ -2011,7 +2051,7 @@ const Dashboard = ({ user, onLogout }) => {
 
               {/* Generator Form */}
               <form
-                className="rounded-2xl p-6"
+                className="rounded-2xl p-5 sm:p-6"
                 style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}
                 onSubmit={handleGenerate}
               >
@@ -2059,17 +2099,17 @@ const Dashboard = ({ user, onLogout }) => {
                       required value={form.featureDescription}
                     />
                   </label>
-                  <div className="md:col-span-2 flex flex-wrap items-end gap-4">
-                    <label className="space-y-2">
+                  <div className="flex flex-col gap-4 md:col-span-2 sm:flex-row sm:flex-wrap sm:items-end">
+                    <label className="space-y-2 sm:w-auto">
                       <span className="text-sm font-medium text-slate-400">Number of test cases</span>
                       <input
-                        className="input-dark w-44"
+                        className="input-dark w-full sm:w-44"
                         max="50" min="1" name="numberOfTestCases"
                         onChange={updateForm} required type="number"
                         value={form.numberOfTestCases}
                       />
                     </label>
-                    <button className="btn-primary flex items-center gap-2" disabled={isGenerating} type="submit">
+                    <button className="btn-primary flex w-full items-center justify-center gap-2 sm:w-auto" disabled={isGenerating} type="submit">
                       {isGenerating ? (
                         <><span className="spinner" /> Generating...</>
                       ) : (
@@ -2095,7 +2135,7 @@ const Dashboard = ({ user, onLogout }) => {
                     <h3 className="text-base font-semibold text-slate-200">Generated Test Cases</h3>
                     <p className="text-sm text-slate-500">{generatedTestCases.length} total</p>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                   <div className="flex w-full flex-wrap gap-2 sm:w-auto">
                     <ExportBtn icon={<IconExcel />} label="Export Excel" accent="green"
                       disabled={!generatedTestCases.length}
                       loading={loading.exporting === "excel:generated-test-cases"}
@@ -2134,7 +2174,7 @@ const Dashboard = ({ user, onLogout }) => {
           {activeView === "projects" && (
             <div className="space-y-6 animate-fade-in">
               <form
-                className="rounded-2xl p-6"
+                className="rounded-2xl p-5 sm:p-6"
                 style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}
                 onSubmit={handleCreateProject}
               >
@@ -2148,7 +2188,7 @@ const Dashboard = ({ user, onLogout }) => {
                     <span className="text-sm font-medium text-slate-400">Description</span>
                     <input className="input-dark" name="description" onChange={updateProjectForm} placeholder="Optional project notes" value={projectForm.description} />
                   </label>
-                  <button className="btn-primary whitespace-nowrap inline-flex items-center justify-center gap-2" disabled={loading.projectCreate} type="submit">
+                  <button className="btn-primary inline-flex w-full items-center justify-center gap-2 whitespace-nowrap md:w-auto" disabled={loading.projectCreate} type="submit">
                     {loading.projectCreate ? <><span className="spinner" /> Saving...</> : "Create Project"}
                   </button>
                 </div>
@@ -2191,7 +2231,7 @@ const Dashboard = ({ user, onLogout }) => {
                             </div>
                           )}
 
-                          <div className="flex flex-wrap gap-2">
+                          <div className="flex flex-wrap gap-2 lg:justify-end">
                             {isEditingProject ? (
                               <>
                                 <button className="btn-primary inline-flex items-center gap-1.5 px-3 py-1.5 text-xs" disabled={loading.projectUpdateId === project.id} onClick={() => handleUpdateProject(project.id)} type="button">
@@ -2228,7 +2268,7 @@ const Dashboard = ({ user, onLogout }) => {
 
           {activeView === "generateBug" && (
             <div className="space-y-6 animate-fade-in">
-              <form className="rounded-2xl p-6" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }} onSubmit={handleGenerateBugReport}>
+              <form className="rounded-2xl p-5 sm:p-6" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }} onSubmit={handleGenerateBugReport}>
                 <h3 className="text-base font-semibold text-slate-200 mb-5">Bug Report Details</h3>
                 <div className="grid gap-5 md:grid-cols-2">
                   <label className="space-y-2">
@@ -2263,7 +2303,7 @@ const Dashboard = ({ user, onLogout }) => {
                     <input className="input-dark" name="environment" onChange={updateBugForm} placeholder="e.g. Chrome 125, Windows 11, QA build" value={bugForm.environment} />
                   </label>
                   <div className="md:col-span-2">
-                    <button className="btn-primary inline-flex items-center gap-2" disabled={loading.generatingBug} type="submit">
+                    <button className="btn-primary inline-flex w-full items-center justify-center gap-2 sm:w-auto" disabled={loading.generatingBug} type="submit">
                       {loading.generatingBug ? <><span className="spinner" /> Generating...</> : <><IconBug /> Generate Bug Report</>}
                     </button>
                   </div>
@@ -2277,7 +2317,7 @@ const Dashboard = ({ user, onLogout }) => {
                       <h3 className="text-base font-semibold text-slate-200">Generated Bug Report</h3>
                       <p className="text-sm text-slate-500">{generatedBugReport.bugId} - {generatedBugReport.severity} severity</p>
                     </div>
-                    <button className="btn-primary inline-flex items-center gap-2" disabled={loading.savingBug} onClick={handleSaveBugReport} type="button">
+                    <button className="btn-primary inline-flex w-full items-center justify-center gap-2 sm:w-auto" disabled={loading.savingBug} onClick={handleSaveBugReport} type="button">
                       {loading.savingBug ? <><span className="spinner" /> Saving...</> : <><IconSave /> Save Bug Report</>}
                     </button>
                   </div>
@@ -2311,7 +2351,7 @@ const Dashboard = ({ user, onLogout }) => {
                     <h3 className="text-base font-semibold text-slate-200">Saved Bug Reports</h3>
                     <p className="text-sm text-slate-500 mt-0.5">{filteredBugReports.length} shown · {selectedBugIds.length} selected</p>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                   <div className="flex w-full flex-wrap gap-2 xl:w-auto">
                     <button
                       className="btn-danger inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold"
                       disabled={!selectedBugIds.length || loading.bulkDeletingBugs}
@@ -2341,7 +2381,7 @@ const Dashboard = ({ user, onLogout }) => {
                     <option style={selectOptionStyle} value="">All statuses</option>
                     {bugStatuses.map((status) => <option key={status} style={selectOptionStyle} value={status}>{status}</option>)}
                   </select>
-                  <button className="btn-ghost whitespace-nowrap" onClick={() => setBugFilters(initialBugFilters)} type="button">Clear</button>
+                  <button className="btn-ghost w-full whitespace-nowrap lg:w-auto" onClick={() => setBugFilters(initialBugFilters)} type="button">Clear</button>
                 </div>
                 {savedBugReports.length === 0 ? (
                   <EmptyState title="No bug reports yet" description="Generate and save a bug report to build your QA issue library." icon={<IconBug />} />
@@ -2380,7 +2420,7 @@ const Dashboard = ({ user, onLogout }) => {
                       {filteredSavedTestCases.length} shown · {selectedSavedIds.length} selected
                     </p>
                   </div>
-                  <div className="flex flex-wrap gap-2">
+                  <div className="flex w-full flex-wrap gap-2 xl:w-auto">
                     <button
                       className="btn-danger inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-semibold"
                       disabled={!selectedSavedIds.length || loading.bulkDeleting}
@@ -2427,7 +2467,7 @@ const Dashboard = ({ user, onLogout }) => {
                     <option style={selectOptionStyle} value="">All statuses</option>
                     {testStatuses.map((status) => <option key={status} style={selectOptionStyle} value={status}>{status}</option>)}
                   </select>
-                  <button className="btn-ghost whitespace-nowrap px-4" onClick={clearFilters} type="button">Clear</button>
+                  <button className="btn-ghost w-full whitespace-nowrap px-4 lg:w-auto" onClick={clearFilters} type="button">Clear</button>
                 </div>
               </div>
 
@@ -2558,7 +2598,7 @@ const Dashboard = ({ user, onLogout }) => {
               </div>
 
               <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
-                <div className="rounded-2xl p-6" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                <div className="rounded-2xl p-5 sm:p-6" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
                   <h3 className="text-base font-semibold text-slate-200 mb-1">Priority Distribution</h3>
                   <p className="text-sm text-slate-500 mb-6">High, medium and low priority saved test cases</p>
                   <div className="h-72">
@@ -2587,7 +2627,7 @@ const Dashboard = ({ user, onLogout }) => {
                   </div>
                 </div>
 
-                <div className="rounded-2xl p-6" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
+                <div className="rounded-2xl p-5 sm:p-6" style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)" }}>
                   <h3 className="text-base font-semibold text-slate-200 mb-1">Analytics Snapshot</h3>
                   <p className="text-sm text-slate-500 mb-6">Current QA library composition</p>
                   <div className="space-y-4">

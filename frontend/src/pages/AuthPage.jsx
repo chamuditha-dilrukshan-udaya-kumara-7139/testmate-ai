@@ -11,7 +11,7 @@ const AuthPage = ({ mode, onModeChange, onSubmit, isLoading, error }) => {
   const isRegister = mode === "register";
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center px-4 py-12 overflow-hidden" style={{ background: "#0f172a" }}>
+    <main className="relative flex min-h-screen items-center justify-center overflow-hidden px-3 py-8 sm:px-4 sm:py-12" style={{ background: "#0f172a" }}>
       <div className="bg-orb w-96 h-96 bg-green-500" style={{ top: "-10%", left: "-5%", animationDelay: "0s" }} />
       <div className="bg-orb w-80 h-80 bg-teal-500" style={{ bottom: "-10%", right: "-5%", animationDelay: "2s" }} />
       <div className="bg-orb w-64 h-64 bg-emerald-400" style={{ top: "40%", right: "10%", animationDelay: "4s" }} />
@@ -32,7 +32,7 @@ const AuthPage = ({ mode, onModeChange, onSubmit, isLoading, error }) => {
       />
 
       <div className="relative z-10 w-full max-w-md animate-scale-in">
-        <div className="text-center mb-8">
+        <div className="mb-6 text-center sm:mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4 animate-glow-pulse"
             style={{
               background: "linear-gradient(135deg, rgba(22,163,74,0.3) 0%, rgba(20,184,166,0.2) 100%)",
@@ -51,7 +51,7 @@ const AuthPage = ({ mode, onModeChange, onSubmit, isLoading, error }) => {
         </div>
 
         <div
-          className="rounded-2xl p-8"
+          className="rounded-2xl p-5 sm:p-8"
           style={{
             background: "rgba(255,255,255,0.04)",
             backdropFilter: "blur(24px)",
@@ -61,7 +61,7 @@ const AuthPage = ({ mode, onModeChange, onSubmit, isLoading, error }) => {
           }}
         >
           <div
-            className="flex mb-8 p-1 rounded-xl"
+            className="mb-6 flex rounded-xl p-1 sm:mb-8"
             style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)" }}
           >
             {["login", "register"].map((m) => (
@@ -69,7 +69,7 @@ const AuthPage = ({ mode, onModeChange, onSubmit, isLoading, error }) => {
                 key={m}
                 type="button"
                 onClick={() => onModeChange(m)}
-                className="flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all duration-300"
+                className="min-w-0 flex-1 rounded-lg py-2.5 text-sm font-semibold transition-all duration-300"
                 style={mode === m ? {
                   background: "linear-gradient(135deg, rgba(22,163,74,0.3) 0%, rgba(20,184,166,0.2) 100%)",
                   color: "#4ade80",
