@@ -7,11 +7,12 @@ import testRoutes from "./routes/testRoutes.js";
 
 const app = express();
 const defaultAllowedOrigins = ["http://localhost:5173", "http://localhost:5174"];
-const envAllowedOrigins = (process.env.CLIENT_URLS || process.env.CLIENT_URL || "")
-  .split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
-const allowedOrigins = envAllowedOrigins.length ? envAllowedOrigins : defaultAllowedOrigins;
+const vercelDeploymentUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "";
+const allowedOrigins = [
+  ...defaultAllowedOrigins,
+  process.env.CLIENT_URL?.trim(),
+  vercelDeploymentUrl
+].filter(Boolean);
 
 app.use(
   cors({
