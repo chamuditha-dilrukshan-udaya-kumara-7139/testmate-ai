@@ -11,6 +11,22 @@ const userResponse = (user) => ({
   email: user.email
 });
 
+const logAuthError = (req, action, error) => {
+  console.error(`${action} failed: ${req.method} ${req.originalUrl} - ${error.message}`);
+};
+
+const authErrorResponse = (error, fallbackMessage) => {
+  if (error?.code === 11000) {
+    return { status: 409, message: "Email is already registered" };
+  }
+
+  if (error?.name === "ValidationError") {
+    return { status: 400, message: error.message };
+  }
+
+  return { status: 500, message: fallbackMessage };
+};
+
 export const register = async (req, res) => {
   try {
     const { name, email, password } = req.body;
@@ -31,8 +47,9 @@ export const register = async (req, res) => {
       token: signToken(user._id)
     });
   } catch (error) {
-    console.error("Registration failed:", error);
-    res.status(500).json({ message: "Registration failed" });
+    logAuthError(req, "Registration", error);
+    const { status, message } = authErrorResponse(error, "Registration failed");
+    res.status(status).json({ message });
   }
 };
 
@@ -56,8 +73,9 @@ export const login = async (req, res) => {
       token: signToken(user._id)
     });
   } catch (error) {
-    console.error("Login failed:", error);
-    res.status(500).json({ message: "Login failed" });
+    logAuthError(req, "Login", error);
+    const { status, message } = authErrorResponse(error, "Login failed");
+    res.status(status).json({ message });
   }
 };
 
