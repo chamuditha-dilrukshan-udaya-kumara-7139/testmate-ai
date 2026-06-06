@@ -7,17 +7,32 @@ import testRoutes from "./routes/testRoutes.js";
 
 const app = express();
 const defaultAllowedOrigins = ["http://localhost:5173", "http://localhost:5174"];
-const vercelDeploymentUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "";
 const allowedOrigins = [
   ...defaultAllowedOrigins,
-  process.env.CLIENT_URL?.trim(),
-  vercelDeploymentUrl
+  process.env.CLIENT_URL?.trim()
 ].filter(Boolean);
+
+const isAllowedOrigin = (origin) => {
+  if (!origin) {
+    return true;
+  }
+
+  if (allowedOrigins.includes(origin)) {
+    return true;
+  }
+
+  try {
+    const { hostname, protocol } = new URL(origin);
+    return protocol === "https:" && hostname.endsWith(".vercel.app");
+  } catch {
+    return false;
+  }
+};
 
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (isAllowedOrigin(origin)) {
         return callback(null, true);
       }
 
